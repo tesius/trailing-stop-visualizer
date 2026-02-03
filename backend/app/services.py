@@ -1,7 +1,7 @@
 import yfinance as yf
 import pandas as pd
 import numpy as np
-from app.models import ChartDataPoint, AnalyzeResponse
+from app.models import AnalyzeRequest, ChartDataPoint, AnalyzeResponse
 
 def fetch_stock_data(ticker: str, days: int, interval: str = "1d") -> pd.DataFrame:
     """
