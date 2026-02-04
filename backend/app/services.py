@@ -165,17 +165,30 @@ def analyze_stock(request: AnalyzeRequest) -> AnalyzeResponse:
     # Note: If input was numeric "005930", fetch_stock_data converts it to "005930.KS" internally, but here request.ticker is still the original input?
     # Actually fetch_stock_data returns a dataframe, it doesn't return the modified ticker string.
     # We should re-evaluate the ticker format logic or check the input `request.ticker`.
-    
+
     currency = "USD"
     ticker_upper = request.ticker.upper()
     if ticker_upper.endswith(".KS") or ticker_upper.endswith(".KQ") or request.ticker.isdigit():
         currency = "KRW"
-        
+
+    # Extract current ATR (last valid ATR value)
+    current_atr = 0.0
+    if not df_final.empty and 'ATR' in df_final.columns:
+        # Get the last non-NaN ATR value
+        atr_values = df_final['ATR'].dropna()
+        if not atr_values.empty:
+            current_atr = float(atr_values.iloc[-1])
+
+    # Calculate volatility amount (ATR × multiplier)
+    volatility_amount = current_atr * request.multiplier
+
     return AnalyzeResponse(
         ticker=request.ticker,
         period=request.period,
         multiplier=request.multiplier,
         currency=currency,
         interval=request.interval,
+        current_atr=current_atr,
+        volatility_amount=volatility_amount,
         data=data_points
     )

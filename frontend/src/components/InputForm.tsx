@@ -22,17 +22,6 @@ const InputForm: React.FC<InputFormProps> = ({ onAnalyze, isLoading, hasResult }
         }
     }, []);
 
-    // Debounce logic for real-time updates
-    useEffect(() => {
-        if (!hasResult) return;
-
-        const timer = setTimeout(() => {
-            onAnalyze(ticker, period, multiplier, days, interval);
-        }, 500); // 500ms debounce
-
-        return () => clearTimeout(timer);
-    }, [multiplier, interval]); // Trigger on multiplier or interval change
-
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         addToRecent(ticker);

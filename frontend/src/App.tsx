@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import InputForm from './components/InputForm';
 import StockChart from './components/StockChart';
+import ATRInfo from './components/ATRInfo';
 import { analyzeStock } from './api/client';
 
 function App() {
@@ -40,7 +41,15 @@ function App() {
         )}
 
         {data && (
-          <StockChart data={data.data} ticker={data.ticker} currency={data.currency} />
+          <>
+            <ATRInfo
+              currentAtr={data.current_atr}
+              volatilityAmount={data.volatility_amount}
+              multiplier={params.multiplier}
+              currency={data.currency}
+            />
+            <StockChart data={data.data} ticker={data.ticker} currency={data.currency} />
+          </>
         )}
       </div>
     </div>

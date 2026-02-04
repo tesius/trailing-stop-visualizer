@@ -25,4 +25,6 @@ class AnalyzeResponse(BaseModel):
     multiplier: float
     currency: str
     interval: str
+    current_atr: float
+    volatility_amount: float
     data: List[ChartDataPoint]
