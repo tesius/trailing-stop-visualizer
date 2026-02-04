@@ -1,44 +1,67 @@
 import React, { useState, useEffect } from 'react';
 
+interface TickerSettings {
+    ticker: string;
+    period: number;
+    multiplier: number;
+}
+
 interface InputFormProps {
     onAnalyze: (ticker: string, period: number, multiplier: number, days: number, interval: string) => void;
     isLoading: boolean;
     hasResult: boolean;
 }
 
+const STORAGE_KEY = 'recentTickerSettings';
+const DEFAULT_PERIOD = 14;
+const DEFAULT_MULTIPLIER = 2.5;
+
 const InputForm: React.FC<InputFormProps> = ({ onAnalyze, isLoading, hasResult }) => {
     const [ticker, setTicker] = useState('AAPL');
-    const [period, setPeriod] = useState(14);
-    const [multiplier, setMultiplier] = useState(2.5);
+    const [period, setPeriod] = useState(DEFAULT_PERIOD);
+    const [multiplier, setMultiplier] = useState(DEFAULT_MULTIPLIER);
     const [days, setDays] = useState(365);
     const [interval, setInterval] = useState('1d');
-    const [recentTickers, setRecentTickers] = useState<string[]>([]);
+    const [recentTickers, setRecentTickers] = useState<TickerSettings[]>([]);
 
     // Load recent tickers from local storage on mount
     useEffect(() => {
-        const savedTickers = localStorage.getItem('recentTickers');
-        if (savedTickers) {
-            setRecentTickers(JSON.parse(savedTickers));
+        const saved = localStorage.getItem(STORAGE_KEY);
+        if (saved) {
+            setRecentTickers(JSON.parse(saved));
+        } else {
+            // migrate old format (string[]) if present
+            const legacy = localStorage.getItem('recentTickers');
+            if (legacy) {
+                const old: string[] = JSON.parse(legacy);
+                const migrated = old.map(t => ({ ticker: t, period: DEFAULT_PERIOD, multiplier: DEFAULT_MULTIPLIER }));
+                setRecentTickers(migrated);
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(migrated));
+                localStorage.removeItem('recentTickers');
+            }
         }
     }, []);
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        addToRecent(ticker);
+        saveToRecent(ticker, period, multiplier);
         onAnalyze(ticker, period, multiplier, days, interval);
     };
 
-    const addToRecent = (newTicker: string) => {
+    const saveToRecent = (newTicker: string, p: number, m: number) => {
         const uTicker = newTicker.toUpperCase();
-        const updatedRecent = [uTicker, ...recentTickers.filter(t => t !== uTicker)].slice(0, 5);
+        const entry: TickerSettings = { ticker: uTicker, period: p, multiplier: m };
+        const updatedRecent = [entry, ...recentTickers.filter(t => t.ticker !== uTicker)].slice(0, 10);
         setRecentTickers(updatedRecent);
-        localStorage.setItem('recentTickers', JSON.stringify(updatedRecent));
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedRecent));
     }
 
-    const handleRecentClick = (clickedTicker: string) => {
-        setTicker(clickedTicker);
-        addToRecent(clickedTicker); // promote to first?
-        onAnalyze(clickedTicker, period, multiplier, days, interval);
+    const handleRecentClick = (item: TickerSettings) => {
+        setTicker(item.ticker);
+        setPeriod(item.period);
+        setMultiplier(item.multiplier);
+        saveToRecent(item.ticker, item.period, item.multiplier);
+        onAnalyze(item.ticker, item.period, item.multiplier, days, interval);
     };
 
     return (
@@ -141,14 +164,15 @@ const InputForm: React.FC<InputFormProps> = ({ onAnalyze, isLoading, hasResult }
                 <div className="flex items-center gap-2 pt-1 border-t border-white/5">
                     <span className="text-[10px] text-gray-500 uppercase font-bold">Recent:</span>
                     <div className="flex flex-wrap gap-2">
-                        {recentTickers.map((t) => (
+                        {recentTickers.map((item) => (
                             <button
-                                key={t}
+                                key={item.ticker}
                                 type="button"
-                                onClick={() => handleRecentClick(t)}
+                                onClick={() => handleRecentClick(item)}
                                 className="text-xs bg-white/5 hover:bg-white/10 text-gray-400 hover:text-emerald-300 px-3 py-1 rounded-full transition-colors border border-white/5"
+                                title={`Period: ${item.period}, Multiplier: ${item.multiplier}`}
                             >
-                                {t}
+                                {item.ticker}
                             </button>
                         ))}
                     </div>
