@@ -12,13 +12,42 @@ interface ChartDataPoint {
     stop_price: number | null;
 }
 
+interface ProfitTargetLevel {
+    level: number;
+    target_price: number;
+    pct_from_entry: number;
+    atr_multiple: number;
+    sell_ratio: number;
+}
+
+interface PositionSell {
+    date: string;
+    price: number;
+    ratio: number;
+    remaining: number;
+    level: number;
+    label: string;
+}
+
+interface ExitStrategyData {
+    trade_type: string;
+    entry_price: number;
+    stop_loss_price: number;
+    first_tp_ratio: number;
+    profit_targets: ProfitTargetLevel[];
+    sells: PositionSell[];
+    weighted_avg_sell_price: number | null;
+    total_return_pct: number | null;
+}
+
 interface StockChartProps {
     data: ChartDataPoint[];
     ticker: string;
     currency: string;
+    exitStrategy?: ExitStrategyData | null;
 }
 
-const StockChart: React.FC<StockChartProps> = ({ data, ticker, currency }) => {
+const StockChart: React.FC<StockChartProps> = ({ data, ticker, currency, exitStrategy }) => {
     const candlestickData = data.map(d => ({
         x: new Date(d.date).getTime(),
         y: [d.open, d.high, d.low, d.close]
@@ -38,7 +67,7 @@ const StockChart: React.FC<StockChartProps> = ({ data, ticker, currency }) => {
             y: d.close
         }));
 
-    const series = [
+    const series: ApexAxisChartSeries = [
         {
             name: 'Price',
             type: 'candlestick',
@@ -56,10 +85,90 @@ const StockChart: React.FC<StockChartProps> = ({ data, ticker, currency }) => {
         }
     ];
 
+    // Add exit strategy sell simulation markers
+    const exitSellData = exitStrategy?.sells
+        ?.filter(s => s.level > 0)
+        .map(s => ({
+            x: new Date(s.date).getTime(),
+            y: s.price
+        })) ?? [];
+
+    if (exitSellData.length > 0) {
+        series.push({
+            name: 'Take Profit',
+            type: 'scatter',
+            data: exitSellData
+        });
+    }
+
+    // Stop-loss sells
+    const exitStopData = exitStrategy?.sells
+        ?.filter(s => s.level === 0)
+        .map(s => ({
+            x: new Date(s.date).getTime(),
+            y: s.price
+        })) ?? [];
+
+    if (exitStopData.length > 0) {
+        series.push({
+            name: 'Stop-Loss Hit',
+            type: 'scatter',
+            data: exitStopData
+        });
+    }
+
     const formatCurrency = (value: number) => {
-        const symbol = currency === 'KRW' ? '₩' : '$';
+        const symbol = currency === 'KRW' ? '\u20A9' : '$';
         return `${symbol}${Math.floor(value).toLocaleString()}`;
     };
+
+    // Build annotations for entry line and profit targets
+    const yAnnotations: YAxisAnnotations[] = [];
+    if (exitStrategy) {
+        // Entry line
+        yAnnotations.push({
+            y: exitStrategy.entry_price,
+            borderColor: '#eab308', // yellow
+            strokeDashArray: 6,
+            label: {
+                text: `Entry ${formatCurrency(exitStrategy.entry_price)}`,
+                borderColor: '#eab308',
+                style: { color: '#000', background: '#eab308', fontSize: '10px', padding: { left: 4, right: 4, top: 2, bottom: 2 } },
+                position: 'left',
+            }
+        });
+
+        // Profit target lines
+        exitStrategy.profit_targets.forEach((t) => {
+            yAnnotations.push({
+                y: t.target_price,
+                borderColor: '#a855f7', // purple
+                strokeDashArray: 4,
+                label: {
+                    text: `TP${t.level} ${formatCurrency(t.target_price)}`,
+                    borderColor: '#a855f7',
+                    style: { color: '#fff', background: '#7e22ce', fontSize: '10px', padding: { left: 4, right: 4, top: 2, bottom: 2 } },
+                    position: 'left',
+                }
+            });
+        });
+    }
+
+    // Determine colors and marker sizes based on series count
+    const baseColors = ['#3b82f6', '#10b981', '#ef4444']; // Blue, Emerald, Red
+    const baseStrokeWidths = [1, 2, 0];
+    const baseMarkerSizes = [0, 0, 6];
+
+    if (exitSellData.length > 0) {
+        baseColors.push('#a855f7'); // purple for TP sells
+        baseStrokeWidths.push(0);
+        baseMarkerSizes.push(8);
+    }
+    if (exitStopData.length > 0) {
+        baseColors.push('#f97316'); // orange for stop-loss hit
+        baseStrokeWidths.push(0);
+        baseMarkerSizes.push(8);
+    }
 
     const options: ApexOptions = {
         chart: {
@@ -105,18 +214,21 @@ const StockChart: React.FC<StockChartProps> = ({ data, ticker, currency }) => {
             }
         },
         stroke: {
-            width: [1, 2, 0], // 0 width for scatter
+            width: baseStrokeWidths,
             curve: 'smooth' // Smoother line for Trailing Stop
         },
-        colors: ['#3b82f6', '#10b981', '#ef4444'], // Blue, Emerald, Red (Sell)
+        colors: baseColors,
         markers: {
-            size: [0, 0, 6], // Only show markers for the 3rd series (Scatter)
-            colors: ['#ef4444'],
+            size: baseMarkerSizes,
+            colors: baseColors.slice(2), // marker fill colors for scatter series
             strokeColors: '#fff',
             strokeWidth: 2,
             hover: {
                 size: 8
             }
+        },
+        annotations: {
+            yaxis: yAnnotations as any,
         },
         xaxis: {
             type: 'datetime',

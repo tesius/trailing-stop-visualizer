@@ -1,4 +1,5 @@
 from fastapi import APIRouter, HTTPException, Query
+from typing import Optional
 from app.models import AnalyzeRequest, AnalyzeResponse
 from app.services import analyze_stock
 
@@ -10,7 +11,11 @@ async def analyze_endpoint(
     period: int = Query(14, description="ATR Period"),
     multiplier: float = Query(2.5, description="ATR Multiplier"),
     days: int = Query(365, description="Days of history to analyze"),
-    interval: str = Query("1d", description="Interval (1d, 1wk, 1mo)")
+    interval: str = Query("1d", description="Interval (1d, 1wk, 1mo)"),
+    trade_type: Optional[str] = Query(None, description="Trade type: A (Homerun), M (Mid-range), B (Single)"),
+    entry_price: Optional[float] = Query(None, description="Entry price for exit strategy"),
+    entry_date: Optional[str] = Query(None, description="Entry date YYYY-MM-DD for simulation start"),
+    first_tp_ratio: Optional[float] = Query(None, description="First take-profit sell ratio (0.5 or 0.25)"),
 ):
     try:
         request = AnalyzeRequest(
@@ -18,7 +23,11 @@ async def analyze_endpoint(
             period=period,
             multiplier=multiplier,
             days=days,
-            interval=interval
+            interval=interval,
+            trade_type=trade_type,
+            entry_price=entry_price,
+            entry_date=entry_date,
+            first_tp_ratio=first_tp_ratio,
         )
         response = analyze_stock(request)
         return response

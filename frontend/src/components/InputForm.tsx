@@ -6,23 +6,41 @@ interface TickerSettings {
     multiplier: number;
 }
 
+export interface ExitStrategyInputs {
+    tradeType: string | null;
+    entryPrice: number | null;
+    entryDate: string;
+    firstTpRatio: number;
+}
+
 interface InputFormProps {
-    onAnalyze: (ticker: string, period: number, multiplier: number, days: number, interval: string) => void;
+    onAnalyze: (ticker: string, period: number, multiplier: number, days: number, interval: string, exitStrategy: ExitStrategyInputs) => void;
     isLoading: boolean;
-    hasResult: boolean;
 }
 
 const STORAGE_KEY = 'recentTickerSettings';
 const DEFAULT_PERIOD = 14;
 const DEFAULT_MULTIPLIER = 2.5;
 
-const InputForm: React.FC<InputFormProps> = ({ onAnalyze, isLoading, hasResult }) => {
+const TRADE_TYPE_DEFAULTS: Record<string, { period: number; multiplier: number; label: string; desc: string }> = {
+    A: { period: 14, multiplier: 3.0, label: 'A', desc: 'Homerun' },
+    M: { period: 20, multiplier: 2.5, label: 'M', desc: 'Mid-range' },
+    B: { period: 22, multiplier: 2.0, label: 'B', desc: 'Single' },
+};
+
+const InputForm: React.FC<InputFormProps> = ({ onAnalyze, isLoading }) => {
     const [ticker, setTicker] = useState('AAPL');
     const [period, setPeriod] = useState(DEFAULT_PERIOD);
     const [multiplier, setMultiplier] = useState(DEFAULT_MULTIPLIER);
     const [days, setDays] = useState(365);
     const [interval, setInterval] = useState('1d');
     const [recentTickers, setRecentTickers] = useState<TickerSettings[]>([]);
+
+    // Exit strategy state
+    const [tradeType, setTradeType] = useState<string | null>(null);
+    const [entryPrice, setEntryPrice] = useState<string>('');
+    const [entryDate, setEntryDate] = useState<string>('');
+    const [firstTpRatio, setFirstTpRatio] = useState<number>(0.5);
 
     // Load recent tickers from local storage on mount
     useEffect(() => {
@@ -42,10 +60,31 @@ const InputForm: React.FC<InputFormProps> = ({ onAnalyze, isLoading, hasResult }
         }
     }, []);
 
+    const handleTradeTypeClick = (type: string) => {
+        if (tradeType === type) {
+            // Deselect
+            setTradeType(null);
+            setPeriod(DEFAULT_PERIOD);
+            setMultiplier(DEFAULT_MULTIPLIER);
+        } else {
+            setTradeType(type);
+            const defaults = TRADE_TYPE_DEFAULTS[type];
+            setPeriod(defaults.period);
+            setMultiplier(defaults.multiplier);
+        }
+    };
+
+    const getExitStrategyInputs = (): ExitStrategyInputs => ({
+        tradeType,
+        entryPrice: entryPrice ? parseFloat(entryPrice) : null,
+        entryDate,
+        firstTpRatio,
+    });
+
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         saveToRecent(ticker, period, multiplier);
-        onAnalyze(ticker, period, multiplier, days, interval);
+        onAnalyze(ticker, period, multiplier, days, interval, getExitStrategyInputs());
     };
 
     const saveToRecent = (newTicker: string, p: number, m: number) => {
@@ -61,7 +100,7 @@ const InputForm: React.FC<InputFormProps> = ({ onAnalyze, isLoading, hasResult }
         setPeriod(item.period);
         setMultiplier(item.multiplier);
         saveToRecent(item.ticker, item.period, item.multiplier);
-        onAnalyze(item.ticker, item.period, item.multiplier, days, interval);
+        onAnalyze(item.ticker, item.period, item.multiplier, days, interval, getExitStrategyInputs());
     };
 
     return (
@@ -157,6 +196,78 @@ const InputForm: React.FC<InputFormProps> = ({ onAnalyze, isLoading, hasResult }
                         {isLoading ? '...' : 'Analyze'}
                     </button>
                 </div>
+            </div>
+
+            {/* Exit Strategy Row */}
+            <div className="flex flex-wrap gap-4 items-end pt-2 border-t border-white/10">
+                {/* Trade Type Toggle */}
+                <div className="flex flex-col gap-1">
+                    <label className="text-[10px] font-bold text-purple-300 uppercase tracking-wider">Trade Type</label>
+                    <div className="flex bg-black/20 rounded-lg p-1 border border-white/10 h-[42px]">
+                        {(['A', 'M', 'B'] as const).map((type) => (
+                            <button
+                                key={type}
+                                type="button"
+                                onClick={() => handleTradeTypeClick(type)}
+                                className={`px-3 py-1 rounded-md text-sm font-medium transition-all ${tradeType === type
+                                    ? 'bg-purple-600 text-white shadow-sm'
+                                    : 'text-gray-400 hover:text-white hover:bg-white/5'
+                                    }`}
+                                title={TRADE_TYPE_DEFAULTS[type].desc}
+                            >
+                                {TRADE_TYPE_DEFAULTS[type].label} <span className="text-[10px] opacity-70">{TRADE_TYPE_DEFAULTS[type].desc}</span>
+                            </button>
+                        ))}
+                    </div>
+                </div>
+
+                {/* Entry Price */}
+                {tradeType && (
+                    <>
+                        <div className="flex flex-col gap-1 w-32">
+                            <label className="text-[10px] font-bold text-purple-300 uppercase tracking-wider">Entry Price</label>
+                            <input
+                                type="number"
+                                value={entryPrice}
+                                onChange={(e) => setEntryPrice(e.target.value)}
+                                className="bg-black/20 border border-purple-500/30 rounded-lg px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-purple-500 transition-all text-center text-base font-mono"
+                                placeholder="0.00"
+                                step="0.01"
+                                min="0.01"
+                            />
+                        </div>
+
+                        <div className="flex flex-col gap-1 min-w-[180px]">
+                            <label className="text-[10px] font-bold text-purple-300 uppercase tracking-wider">Entry Date</label>
+                            <input
+                                type="date"
+                                value={entryDate}
+                                onChange={(e) => setEntryDate(e.target.value)}
+                                className="bg-black/20 border border-purple-500/30 rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-purple-500 transition-all text-base font-mono [color-scheme:dark]"
+                            />
+                        </div>
+
+                        {/* 1st TP Ratio Toggle */}
+                        <div className="flex flex-col gap-1">
+                            <label className="text-[10px] font-bold text-purple-300 uppercase tracking-wider">1st TP Sell</label>
+                            <div className="flex bg-black/20 rounded-lg p-1 border border-white/10 h-[42px]">
+                                {[0.5, 0.25].map((ratio) => (
+                                    <button
+                                        key={ratio}
+                                        type="button"
+                                        onClick={() => setFirstTpRatio(ratio)}
+                                        className={`px-3 py-1 rounded-md text-sm font-medium transition-all ${firstTpRatio === ratio
+                                            ? 'bg-purple-600 text-white shadow-sm'
+                                            : 'text-gray-400 hover:text-white hover:bg-white/5'
+                                            }`}
+                                    >
+                                        {ratio * 100}%
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    </>
+                )}
             </div>
 
             {/* Bottom Row: Recent Tickers */}
