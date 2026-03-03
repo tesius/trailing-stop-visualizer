@@ -1,10 +1,15 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import Header from './components/Header';
+import Footer from './components/Footer';
 import InputForm from './components/InputForm';
 import type { ExitStrategyInputs } from './components/InputForm';
 import StockChart from './components/StockChart';
+import StatsPanel from './components/StatsPanel';
 import ATRInfo from './components/ATRInfo';
 import ExitStrategyInfo from './components/ExitStrategyInfo';
+import ErrorBanner from './components/ErrorBanner';
+import LoadingSkeleton from './components/LoadingSkeleton';
 import { analyzeStock } from './api/client';
 import type { ExitStrategyParams } from './api/client';
 
@@ -18,6 +23,9 @@ function App() {
     exitStrategy: undefined as ExitStrategyParams | undefined,
     shouldFetch: false
   });
+
+  const [showStop, setShowStop] = useState(true);
+  const [showBuy, setShowBuy] = useState(true);
 
   const { data, isLoading, error } = useQuery({
     queryKey: ['analyze', params.ticker, params.period, params.multiplier, params.days, params.interval,
@@ -41,39 +49,53 @@ function App() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black p-8 text-white">
-      <div className="max-w-7xl mx-auto">
-        <h1 className="text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400 mb-10 tracking-tight">ATR Trailing Stop Visualizer</h1>
+    <div className="flex flex-col min-h-screen bg-gradient-to-b from-gray-950 via-gray-900 to-gray-950 text-white">
+      <Header />
 
-        <InputForm onAnalyze={handleAnalyze} isLoading={isLoading} />
-
-        {error && (
-          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mt-6" role="alert">
-            <strong className="font-bold">Error: </strong>
-            <span className="block sm:inline">{(error as any).response?.data?.detail || (error as Error).message}</span>
+      <main className="flex-1 px-4 pb-8">
+        <div className="max-w-7xl mx-auto space-y-6">
+          <div className="animate-fade-in-up">
+            <InputForm onAnalyze={handleAnalyze} isLoading={isLoading} />
           </div>
-        )}
 
-        {data && (
-          <>
-            <ATRInfo
-              currentAtr={data.current_atr}
-              volatilityAmount={data.volatility_amount}
-              multiplier={params.multiplier}
-              currency={data.currency}
-            />
-            {data.exit_strategy && (
-              <ExitStrategyInfo data={data.exit_strategy} currency={data.currency} />
-            )}
-            <StockChart
-              data={data.data}
-              ticker={data.ticker}
-              currency={data.currency}
-              exitStrategy={data.exit_strategy}
-            />
-          </>
-        )}
-      </div>
+          {error && <ErrorBanner error={error as any} />}
+
+          {isLoading && <LoadingSkeleton />}
+
+          {data && !isLoading && (
+            <>
+              <StatsPanel
+                data={data.data}
+                ticker={data.ticker}
+                currency={data.currency}
+                showStop={showStop}
+                showBuy={showBuy}
+              />
+              <ATRInfo
+                currentAtr={data.current_atr}
+                volatilityAmount={data.volatility_amount}
+                multiplier={params.multiplier}
+                currency={data.currency}
+              />
+              {data.exit_strategy && (
+                <ExitStrategyInfo data={data.exit_strategy} currency={data.currency} />
+              )}
+              <StockChart
+                data={data.data}
+                ticker={data.ticker}
+                currency={data.currency}
+                showStop={showStop}
+                showBuy={showBuy}
+                onToggleStop={() => setShowStop(s => !s)}
+                onToggleBuy={() => setShowBuy(b => !b)}
+                exitStrategy={data.exit_strategy}
+              />
+            </>
+          )}
+        </div>
+      </main>
+
+      <Footer />
     </div>
   );
 }

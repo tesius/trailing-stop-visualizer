@@ -1,71 +1,75 @@
-# CLAUDE.md
-
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+# ATR Trailing Stop Visualizer
 
 ## Project Overview
+ATR(Average True Range) 기반 트레일링 스톱 시각화 도구. 주식 종목의 가격 데이터와 ATR 트레일링 스톱 라인을 캔들스틱 차트로 시각화한다.
 
-ATR Trailing Stop Visualizer - a full-stack app for visualizing stock price movements with ATR (Average True Range) trailing stop indicators. Helps traders visualize volatility-adjusted exit points.
+## Architecture
+- **Monorepo** 구조: `frontend/` + `backend/` 디렉터리
+- Frontend → Backend API 호출 (`GET /analyze`)
 
-**Architecture**: Monorepo with separate frontend and backend directories
-- **Frontend**: React 19 + TypeScript + Vite 7 + TailwindCSS v4 + ApexCharts
-- **Backend**: FastAPI (Python) + yfinance for stock data
+### Backend (Python / FastAPI)
+- **Runtime**: Python 3.14, FastAPI + Uvicorn
+- **Dependencies**: `backend/requirements.txt` (fastapi, uvicorn, yfinance, pandas, numpy, pydantic)
+- **Virtual env**: `backend/.venv/`
+- **Entry point**: `backend/app/main.py`
+- **Port**: 8000
 
-## Development Commands
+#### Key files
+| File | Role |
+|---|---|
+| `app/main.py` | FastAPI app 생성, CORS, 라우터 등록 |
+| `app/api.py` | `GET /analyze` 엔드포인트 (query params: ticker, period, multiplier, days, interval, trade_type, entry_price, entry_date, first_tp_ratio) |
+| `app/models.py` | Pydantic 모델 (`AnalyzeRequest`, `ChartDataPoint`, `AnalyzeResponse`, `ExitStrategyData` 등) |
+| `app/services.py` | yfinance 데이터 수집, ATR 계산, 트레일링 스톱/바이 래칫 로직, Exit Strategy 계산 |
 
-### Backend (FastAPI)
+#### Domain Logic
+- ATR: Wilder's smoothing (pandas `ewm(alpha=1/period)`)
+- 트레일링 스톱: 래칫 메커니즘 (상승 추세 시 스톱은 올라가기만 함, 이탈 시 리셋)
+- 트레일링 바이: 래칫 메커니즘 (하락 추세 시 바이는 내려가기만 함, 이탈 시 리셋)
+- 한국 주식 지원: 숫자 티커 → `.KS` 접미사 자동 변환, KRW 통화 감지
+- Exit Strategy: Trade Type (A/M/B)별 Profit Target 계산, Position Sizing 시뮬레이션
+
+### Frontend (React / TypeScript / Vite)
+- **Runtime**: Node.js, Vite 7, React 19, TypeScript 5.9
+- **Styling**: Tailwind CSS v4 (postcss plugin 방식)
+- **Chart**: TradingView Lightweight Charts v5 — 캔들스틱 + 트레일링 스톱/바이 라인 + 매도/매수 시그널 마커
+- **Data fetching**: TanStack React Query + Axios
+- **Port**: 5173 (Vite default)
+
+#### Key files
+| File | Role |
+|---|---|
+| `src/App.tsx` | 메인 컴포넌트, React Query로 데이터 fetch, showStop/showBuy 토글 |
+| `src/components/InputForm.tsx` | 입력 폼 (ticker, interval, period, days, multiplier slider, trade type, exit strategy, 최근 검색 이력) |
+| `src/components/StockChart.tsx` | Lightweight Charts 캔들스틱 차트 렌더링 (Stop/Buy 라인, 시그널 마커, Exit Strategy 마커) |
+| `src/components/StatsPanel.tsx` | 현재가, Stop/Buy 거리 등 핵심 지표 카드 |
+| `src/components/ATRInfo.tsx` | ATR, Multiplier, Volatility Amount 표시 |
+| `src/components/ExitStrategyInfo.tsx` | Exit Strategy 상세 (Profit Targets, Simulation Timeline) |
+| `src/components/Header.tsx` | 앱 헤더 |
+| `src/components/Footer.tsx` | 앱 푸터 |
+| `src/components/ErrorBanner.tsx` | 에러 배너 |
+| `src/components/LoadingSkeleton.tsx` | 로딩 스켈레톤 |
+| `src/api/client.ts` | Axios 클라이언트, `analyzeStock()` 함수 |
+
+## Common Commands
+
 ```bash
+# Backend
 cd backend
+source .venv/bin/activate
 pip install -r requirements.txt
-uvicorn app.main:app --reload          # Dev server on port 8000
-python verify_currency.py              # Test currency detection logic
-```
+uvicorn app.main:app --reload
 
-### Frontend (React + Vite)
-```bash
+# Frontend
 cd frontend
-npm install
-npm run dev       # Dev server on port 5173
-npm run build     # TypeScript check (tsc -b) + Vite production build
-npm run lint      # ESLint
-npm run preview   # Preview production build
+pnpm install
+pnpm dev           # dev server (port 5173)
+pnpm build         # tsc -b && vite build
+pnpm lint          # eslint
 ```
 
-### Running Full Stack
-1. Start backend: `cd backend && uvicorn app.main:app --reload`
-2. Start frontend: `cd frontend && npm run dev`
-3. Access at `http://localhost:5173`
-
-## Code Architecture
-
-### Backend (`backend/app/`)
-
-**Request flow**: `api.py` (endpoint) → `services.py` (business logic) → `models.py` (data shapes)
-
-- **`main.py`**: FastAPI app with CORS middleware (allows localhost:5173, localhost:3000, and `*`)
-- **`api.py`**: Single `GET /analyze` endpoint accepting query params: `ticker` (required), `period`, `multiplier`, `days`, `interval`
-- **`services.py`**: Core logic in three functions:
-  - `fetch_stock_data()` — fetches OHLCV via yfinance; auto-appends `.KS` for numeric tickers (Korean stocks)
-  - `calculate_atr_trailing_stop()` — ATR via Wilder's smoothing (EWMA, alpha=1/period) + ratchet trailing stop
-  - `analyze_stock()` — orchestrates fetch → calculate → format response; detects currency (KRW vs USD)
-- **`models.py`**: Pydantic models — `AnalyzeRequest`, `AnalyzeResponse`, `ChartDataPoint`
-
-### Frontend (`frontend/src/`)
-
-**Component hierarchy**: `App.tsx` → `InputForm.tsx` + `StockChart.tsx`
-
-- **`App.tsx`**: Manages state via TanStack Query (`useQuery` for `/analyze` calls); renders form, chart, and ATR info
-- **`components/InputForm.tsx`**: Form with ticker input, interval toggle (1d/1wk/1mo), period/days inputs, multiplier slider; debounced auto-refresh (500ms); persists recent tickers in localStorage
-- **`components/StockChart.tsx`**: ApexCharts candlestick chart with trailing stop line overlay and red scatter markers for sell signals (close < stop_price); currency-aware axis formatting (₩ / $)
-- **`api/client.ts`**: Axios client pointing to `http://localhost:8000`
-
-### Key Algorithm: ATR Trailing Stop
-
-The trailing stop uses a **ratchet mechanism**:
-- True Range: `TR = max(High-Low, |High-PrevClose|, |Low-PrevClose|)`
-- ATR: exponential weighted moving average with `alpha = 1/period`
-- Basic Stop: `Close - (ATR × Multiplier)`
-- Ratchet: if previous close > previous stop → new stop = max(previous stop, basic stop) (only moves up); if previous close ≤ previous stop → reset to basic stop
-
-### Korean Stock Support
-- Numeric tickers (e.g., "005930") auto-convert to `.KS` format for yfinance
-- Currency detection: `.KS`/`.KQ` suffixes or numeric-only tickers → KRW; otherwise USD
+## Conventions
+- Backend: Python, snake_case, Pydantic models for request/response validation
+- Frontend: TypeScript, React functional components, Tailwind utility classes
+- Dark theme UI with glassmorphism styling
+- Korean language comments are acceptable

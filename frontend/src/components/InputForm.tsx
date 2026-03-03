@@ -42,13 +42,11 @@ const InputForm: React.FC<InputFormProps> = ({ onAnalyze, isLoading }) => {
     const [entryDate, setEntryDate] = useState<string>('');
     const [firstTpRatio, setFirstTpRatio] = useState<number>(0.5);
 
-    // Load recent tickers from local storage on mount
     useEffect(() => {
         const saved = localStorage.getItem(STORAGE_KEY);
         if (saved) {
             setRecentTickers(JSON.parse(saved));
         } else {
-            // migrate old format (string[]) if present
             const legacy = localStorage.getItem('recentTickers');
             if (legacy) {
                 const old: string[] = JSON.parse(legacy);
@@ -62,7 +60,6 @@ const InputForm: React.FC<InputFormProps> = ({ onAnalyze, isLoading }) => {
 
     const handleTradeTypeClick = (type: string) => {
         if (tradeType === type) {
-            // Deselect
             setTradeType(null);
             setPeriod(DEFAULT_PERIOD);
             setMultiplier(DEFAULT_MULTIPLIER);
@@ -93,7 +90,7 @@ const InputForm: React.FC<InputFormProps> = ({ onAnalyze, isLoading }) => {
         const updatedRecent = [entry, ...recentTickers.filter(t => t.ticker !== uTicker)].slice(0, 10);
         setRecentTickers(updatedRecent);
         localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedRecent));
-    }
+    };
 
     const handleRecentClick = (item: TickerSettings) => {
         setTicker(item.ticker);
@@ -104,36 +101,36 @@ const InputForm: React.FC<InputFormProps> = ({ onAnalyze, isLoading }) => {
     };
 
     return (
-        <form onSubmit={handleSubmit} className="bg-white/10 backdrop-blur-md border border-white/20 p-6 rounded-2xl shadow-xl flex flex-col gap-4 w-full max-w-6xl mx-auto">
-            {/* Top Row: All Controls */}
-            <div className="flex flex-wrap gap-4 items-end">
-
-                {/* Ticker Input */}
-                <div className="flex flex-col gap-1 min-w-[140px]">
-                    <label className="text-[10px] font-bold text-blue-300 uppercase tracking-wider">Ticker</label>
+        <form onSubmit={handleSubmit} className="bg-white/[0.04] backdrop-blur-xl border border-white/[0.06] p-5 rounded-2xl space-y-4">
+            {/* Row 1: Inputs + Button */}
+            <div className="grid grid-cols-2 md:grid-cols-[1fr_auto_80px_90px_auto] gap-3 items-end">
+                {/* Ticker */}
+                <div className="flex flex-col gap-1.5">
+                    <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Ticker</label>
                     <input
                         type="text"
                         value={ticker}
                         onChange={(e) => setTicker(e.target.value.toUpperCase())}
-                        className="bg-black/20 border border-white/10 rounded-lg px-3 py-2 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all font-mono text-base"
+                        className="bg-white/[0.04] border border-white/[0.08] rounded-lg px-3 py-2.5 text-white placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all font-mono text-sm"
                         placeholder="AAPL"
                         required
                     />
                 </div>
 
                 {/* Interval Toggle */}
-                <div className="flex flex-col gap-1">
-                    <label className="text-[10px] font-bold text-blue-300 uppercase tracking-wider">Interval</label>
-                    <div className="flex bg-black/20 rounded-lg p-1 border border-white/10 h-[42px]">
+                <div className="flex flex-col gap-1.5">
+                    <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Interval</label>
+                    <div className="flex bg-white/[0.04] rounded-lg p-1 border border-white/[0.08] h-[42px]">
                         {['1d', '1wk', '1mo'].map((int) => (
                             <button
                                 key={int}
                                 type="button"
                                 onClick={() => setInterval(int)}
-                                className={`px-3 py-1 rounded-md text-sm font-medium transition-all ${interval === int
-                                    ? 'bg-blue-600 text-white shadow-sm'
-                                    : 'text-gray-400 hover:text-white hover:bg-white/5'
-                                    }`}
+                                className={`px-3 py-1 rounded-md text-xs font-medium transition-all ${
+                                    interval === int
+                                        ? 'bg-blue-600 text-white shadow-sm'
+                                        : 'text-gray-500 hover:text-gray-300 hover:bg-white/[0.04]'
+                                }`}
                             >
                                 {int === '1d' ? 'Daily' : int === '1wk' ? 'Weekly' : 'Monthly'}
                             </button>
@@ -141,78 +138,86 @@ const InputForm: React.FC<InputFormProps> = ({ onAnalyze, isLoading }) => {
                     </div>
                 </div>
 
-                {/* Period Input */}
-                <div className="flex flex-col gap-1 w-20">
-                    <label className="text-[10px] font-bold text-blue-300 uppercase tracking-wider">Period</label>
+                {/* Period */}
+                <div className="flex flex-col gap-1.5">
+                    <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Period</label>
                     <input
                         type="number"
                         value={period}
                         onChange={(e) => setPeriod(parseInt(e.target.value))}
-                        className="bg-black/20 border border-white/10 rounded-lg px-2 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all text-center text-base"
+                        className="bg-white/[0.04] border border-white/[0.08] rounded-lg px-2 py-2.5 text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all text-center text-sm"
                         min="1"
                     />
                 </div>
 
-                {/* Days Input */}
-                <div className="flex flex-col gap-1 w-24">
-                    <label className="text-[10px] font-bold text-blue-300 uppercase tracking-wider">Days</label>
+                {/* Days */}
+                <div className="flex flex-col gap-1.5">
+                    <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Days</label>
                     <input
                         type="number"
                         value={days}
                         onChange={(e) => setDays(parseInt(e.target.value))}
-                        className="bg-black/20 border border-white/10 rounded-lg px-2 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all text-center text-base"
+                        className="bg-white/[0.04] border border-white/[0.08] rounded-lg px-2 py-2.5 text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all text-center text-sm"
                         min="30"
                     />
                 </div>
 
-                {/* Multiplier Slider (Inline) */}
-                <div className="flex flex-col gap-1 flex-grow min-w-[200px] px-2">
-                    <div className="flex justify-between items-center">
-                        <label className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider">Multiplier</label>
-                        <span className="text-sm font-bold text-emerald-400 font-mono">{multiplier.toFixed(1)}</span>
-                    </div>
-                    <div className="flex items-center gap-2 h-[42px]"> {/* Match height of inputs */}
-                        <span className="text-[10px] text-gray-400">0.5</span>
-                        <input
-                            type="range"
-                            min="0.5"
-                            max="10"
-                            step="0.1"
-                            value={multiplier}
-                            onChange={(e) => setMultiplier(parseFloat(e.target.value))}
-                            className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-emerald-500"
-                        />
-                        <span className="text-[10px] text-gray-400">10</span>
-                    </div>
-                </div>
-
                 {/* Analyze Button */}
-                <div className="flex flex-col justify-end">
+                <div className="flex flex-col justify-end col-span-2 md:col-span-1">
                     <button
                         type="submit"
                         disabled={isLoading}
-                        className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold py-2 px-6 rounded-lg shadow-lg transform transition-all hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none h-[42px]"
+                        className="bg-blue-600 hover:bg-blue-500 text-white font-semibold py-2.5 px-6 rounded-lg transition-all disabled:opacity-40 disabled:cursor-not-allowed h-[42px] text-sm"
                     >
-                        {isLoading ? '...' : 'Analyze'}
+                        {isLoading ? (
+                            <span className="flex items-center justify-center gap-2">
+                                <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                                </svg>
+                                Analyzing
+                            </span>
+                        ) : 'Analyze'}
                     </button>
                 </div>
             </div>
 
-            {/* Exit Strategy Row */}
-            <div className="flex flex-wrap gap-4 items-end pt-2 border-t border-white/10">
+            {/* Row 2: Multiplier Slider */}
+            <div className="px-1">
+                <div className="flex justify-between items-center mb-2">
+                    <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">ATR Multiplier</label>
+                    <span className="text-sm font-bold text-blue-400 font-mono">{multiplier.toFixed(1)}</span>
+                </div>
+                <div className="flex items-center gap-3">
+                    <span className="text-[10px] text-gray-600 w-6">0.5</span>
+                    <input
+                        type="range"
+                        min="0.5"
+                        max="10"
+                        step="0.1"
+                        value={multiplier}
+                        onChange={(e) => setMultiplier(parseFloat(e.target.value))}
+                        className="w-full h-1.5 bg-white/[0.08] rounded-full appearance-none cursor-pointer accent-blue-500"
+                    />
+                    <span className="text-[10px] text-gray-600 w-6 text-right">10</span>
+                </div>
+            </div>
+
+            {/* Row 3: Exit Strategy */}
+            <div className="flex flex-wrap gap-3 items-end pt-2 border-t border-white/[0.06]">
                 {/* Trade Type Toggle */}
-                <div className="flex flex-col gap-1">
-                    <label className="text-[10px] font-bold text-purple-300 uppercase tracking-wider">Trade Type</label>
-                    <div className="flex bg-black/20 rounded-lg p-1 border border-white/10 h-[42px]">
+                <div className="flex flex-col gap-1.5">
+                    <label className="text-[10px] font-bold text-purple-400 uppercase tracking-wider">Trade Type</label>
+                    <div className="flex bg-white/[0.04] rounded-lg p-1 border border-white/[0.08] h-[42px]">
                         {(['A', 'M', 'B'] as const).map((type) => (
                             <button
                                 key={type}
                                 type="button"
                                 onClick={() => handleTradeTypeClick(type)}
-                                className={`px-3 py-1 rounded-md text-sm font-medium transition-all ${tradeType === type
+                                className={`px-3 py-1 rounded-md text-xs font-medium transition-all ${tradeType === type
                                     ? 'bg-purple-600 text-white shadow-sm'
-                                    : 'text-gray-400 hover:text-white hover:bg-white/5'
-                                    }`}
+                                    : 'text-gray-500 hover:text-gray-300 hover:bg-white/[0.04]'
+                                }`}
                                 title={TRADE_TYPE_DEFAULTS[type].desc}
                             >
                                 {TRADE_TYPE_DEFAULTS[type].label} <span className="text-[10px] opacity-70">{TRADE_TYPE_DEFAULTS[type].desc}</span>
@@ -221,45 +226,43 @@ const InputForm: React.FC<InputFormProps> = ({ onAnalyze, isLoading }) => {
                     </div>
                 </div>
 
-                {/* Entry Price */}
                 {tradeType && (
                     <>
-                        <div className="flex flex-col gap-1 w-32">
-                            <label className="text-[10px] font-bold text-purple-300 uppercase tracking-wider">Entry Price</label>
+                        <div className="flex flex-col gap-1.5 w-32">
+                            <label className="text-[10px] font-bold text-purple-400 uppercase tracking-wider">Entry Price</label>
                             <input
                                 type="number"
                                 value={entryPrice}
                                 onChange={(e) => setEntryPrice(e.target.value)}
-                                className="bg-black/20 border border-purple-500/30 rounded-lg px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-purple-500 transition-all text-center text-base font-mono"
+                                className="bg-white/[0.04] border border-purple-500/30 rounded-lg px-3 py-2.5 text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50 transition-all text-center text-sm font-mono"
                                 placeholder="0.00"
                                 step="0.01"
                                 min="0.01"
                             />
                         </div>
 
-                        <div className="flex flex-col gap-1 min-w-[180px]">
-                            <label className="text-[10px] font-bold text-purple-300 uppercase tracking-wider">Entry Date</label>
+                        <div className="flex flex-col gap-1.5 min-w-[180px]">
+                            <label className="text-[10px] font-bold text-purple-400 uppercase tracking-wider">Entry Date</label>
                             <input
                                 type="date"
                                 value={entryDate}
                                 onChange={(e) => setEntryDate(e.target.value)}
-                                className="bg-black/20 border border-purple-500/30 rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-purple-500 transition-all text-base font-mono [color-scheme:dark]"
+                                className="bg-white/[0.04] border border-purple-500/30 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50 transition-all text-sm font-mono [color-scheme:dark]"
                             />
                         </div>
 
-                        {/* 1st TP Ratio Toggle */}
-                        <div className="flex flex-col gap-1">
-                            <label className="text-[10px] font-bold text-purple-300 uppercase tracking-wider">1st TP Sell</label>
-                            <div className="flex bg-black/20 rounded-lg p-1 border border-white/10 h-[42px]">
+                        <div className="flex flex-col gap-1.5">
+                            <label className="text-[10px] font-bold text-purple-400 uppercase tracking-wider">1st TP Sell</label>
+                            <div className="flex bg-white/[0.04] rounded-lg p-1 border border-white/[0.08] h-[42px]">
                                 {[0.5, 0.25].map((ratio) => (
                                     <button
                                         key={ratio}
                                         type="button"
                                         onClick={() => setFirstTpRatio(ratio)}
-                                        className={`px-3 py-1 rounded-md text-sm font-medium transition-all ${firstTpRatio === ratio
+                                        className={`px-3 py-1 rounded-md text-xs font-medium transition-all ${firstTpRatio === ratio
                                             ? 'bg-purple-600 text-white shadow-sm'
-                                            : 'text-gray-400 hover:text-white hover:bg-white/5'
-                                            }`}
+                                            : 'text-gray-500 hover:text-gray-300 hover:bg-white/[0.04]'
+                                        }`}
                                     >
                                         {ratio * 100}%
                                     </button>
@@ -270,17 +273,17 @@ const InputForm: React.FC<InputFormProps> = ({ onAnalyze, isLoading }) => {
                 )}
             </div>
 
-            {/* Bottom Row: Recent Tickers */}
+            {/* Row 4: Recent Tickers */}
             {recentTickers.length > 0 && (
-                <div className="flex items-center gap-2 pt-1 border-t border-white/5">
-                    <span className="text-[10px] text-gray-500 uppercase font-bold">Recent:</span>
-                    <div className="flex flex-wrap gap-2">
+                <div className="flex items-center gap-2 pt-2 border-t border-white/[0.04]">
+                    <span className="text-[10px] text-gray-600 uppercase font-bold">Recent:</span>
+                    <div className="flex flex-wrap gap-1.5">
                         {recentTickers.map((item) => (
                             <button
                                 key={item.ticker}
                                 type="button"
                                 onClick={() => handleRecentClick(item)}
-                                className="text-xs bg-white/5 hover:bg-white/10 text-gray-400 hover:text-emerald-300 px-3 py-1 rounded-full transition-colors border border-white/5"
+                                className="text-xs bg-white/[0.04] hover:bg-white/[0.08] text-gray-500 hover:text-white px-3 py-1 rounded-full transition-colors border border-white/[0.06] font-mono"
                                 title={`Period: ${item.period}, Multiplier: ${item.multiplier}`}
                             >
                                 {item.ticker}

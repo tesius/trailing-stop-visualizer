@@ -14,13 +14,7 @@ def fetch_stock_data(ticker: str, days: int, interval: str = "1d") -> pd.DataFra
     if ticker.isdigit():
         ticker = f"{ticker}.KS"
 
-    # Create Ticker object
     stock = yf.Ticker(ticker)
-
-    # Calculate start date based on 'days' roughly, or just use period string.
-    # yfinance period options: 1d,5d,1mo,3mo,6mo,1y,2y,5y,10y,ytd,max
-    # We will try to map days to a period string or just fetch enough history.
-    # To be safe for 365 days, we might want '2y' to have buffer for calculations.
 
     period = "1y"
     if days > 365:
@@ -35,112 +29,100 @@ def fetch_stock_data(ticker: str, days: int, interval: str = "1d") -> pd.DataFra
     if df.empty:
         raise ValueError(f"No data found for ticker {ticker}")
 
-    # Standardize columns
     df = df[['Open', 'High', 'Low', 'Close', 'Volume']]
     return df
 
-def calculate_atr_trailing_stop(df: pd.DataFrame, period: int = 14, multiplier: float = 2.5) -> pd.DataFrame:
+def calculate_atr(df: pd.DataFrame, period: int = 14) -> pd.DataFrame:
     """
-    Calculates ATR and Trailing Stop Price.
-    Returns DataFrame with 'stop_price' column.
+    Calculates True Range and ATR (Wilder's smoothing).
+    Returns DataFrame with 'TR' and 'ATR' columns added.
     """
-    # Create a copy to allow modification
     data = df.copy()
-
-    # 1. Calculate TR (True Range)
-    # TR = Max(High - Low, abs(High - PrevClose), abs(Low - PrevClose))
 
     data['PrevClose'] = data['Close'].shift(1)
     data['TR1'] = data['High'] - data['Low']
     data['TR2'] = abs(data['High'] - data['PrevClose'])
     data['TR3'] = abs(data['Low'] - data['PrevClose'])
     data['TR'] = data[['TR1', 'TR2', 'TR3']].max(axis=1)
-
-    # 2. Calculate ATR
-    # Using simple rolling mean for ATR to start, or EWMA (Wilder's Smoothing is standard but simple rolling is okay for V1)
-    # yfinance/pandas often use Wilder's: ATR = (PrevATR * (n-1) + CurrentTR) / n
-    # For simplicity here, we use pandas ewm with com=period-1 which approximates Wilder's
     data['ATR'] = data['TR'].ewm(alpha=1/period, adjust=False).mean()
 
-    # 3. Calculate Trailing Stop (Chandelier Exit-like / Ratchet)
-    # Concept: Long Stop.
-    # Initial Basic Stop = Close - (ATR * Multiplier)
-    # Logic:
-    # If PrevClose > PrevStop:
-    #    CurrentStop = Max(BasicStop, PrevStop)
-    # Else:
-    #    CurrentStop = BasicStop
+    return data
+
+def calculate_atr_trailing_stop(df: pd.DataFrame, period: int = 14, multiplier: float = 2.5) -> pd.DataFrame:
+    """
+    Calculates Trailing Stop Price using ATR.
+    Expects df to already have 'ATR' column (from calculate_atr).
+    """
+    data = df.copy()
 
     data['BasicStop'] = data['Close'] - (data['ATR'] * multiplier)
-    data['FinalStop'] = 0.0
-    data['Trend'] = 'up' # Assume starting up
-
-    # Iterative calculation for ratchet mechanism
-    # Note: Vectorizing this conditionally based on previous row is hard, using loop is safer for correctness here
-    # Start from index 'period' to have valid ATR
 
     final_stops = np.zeros(len(data))
-    trends = np.empty(len(data), dtype=object)
-    trends[:] = 'up' # Initialize all to 'up'
 
-    # Convert series to numpy for speed
     closes = data['Close'].values
     basic_stops = data['BasicStop'].values
 
-    # Initialize first valid value
     final_stops[period-1] = basic_stops[period-1]
-
-    # Using the standard 'SuperTrend' indicator logic partly,
-    # or just a simple Trailing Stop that resets when price crosses under.
-
-    current_stop = basic_stops[period-1]
 
     for i in range(period, len(data)):
         prev_stop = final_stops[i-1]
-        close = closes[i]
         prev_close = closes[i-1]
         basic_stop = basic_stops[i]
 
-        # Ratchet Logic for Long Position
-        # If we were in an uptrend (Close > Stop), we keep raising the stop.
-        # If Close drops below Stop, the trend breaks (Stop Hit).
-        # For visualization, we often want to see where the stop WOULD be.
-
-        # Implementation: Standard Trailing Stop (Long Only view)
-        # "If the price is above the stop line, the stop line can only move up."
-        # If the price drops below, we reset the stop line to the new basic stop (or it becomes a short stop).
-        # PRD implies a single line. Let's do the "Always Long Data" version for simplicity,
-        # or better: Resettable Trailing Stop.
-
         if prev_close > prev_stop:
-            # We were safe. New stop is max(old stop, new basic stop)
-            current_stop = max(prev_stop, basic_stop)
+            final_stops[i] = max(prev_stop, basic_stop)
         else:
-            # We were stopped out. Reset to basic stop.
-            current_stop = basic_stop
-
-        final_stops[i] = current_stop
+            final_stops[i] = basic_stop
 
     data['StopPrice'] = final_stops
 
-    # Clean up
+    return data
+
+def calculate_atr_trailing_buy(df: pd.DataFrame, period: int = 14, multiplier: float = 2.5) -> pd.DataFrame:
+    """
+    Calculates Trailing Buy Price using ATR.
+    Expects df to already have 'ATR' column (from calculate_atr).
+    BasicBuy = Close + (ATR * Multiplier) — above the price
+    Ratchet: in downtrend (close < buy line), buy line can only go DOWN.
+    When close crosses above buy line, reset.
+    """
+    data = df.copy()
+
+    data['BasicBuy'] = data['Close'] + (data['ATR'] * multiplier)
+
+    final_buys = np.zeros(len(data))
+
+    closes = data['Close'].values
+    basic_buys = data['BasicBuy'].values
+
+    final_buys[period-1] = basic_buys[period-1]
+
+    for i in range(period, len(data)):
+        prev_buy = final_buys[i-1]
+        prev_close = closes[i-1]
+        basic_buy = basic_buys[i]
+
+        if prev_close < prev_buy:
+            final_buys[i] = min(prev_buy, basic_buy)
+        else:
+            final_buys[i] = basic_buy
+
+    data['BuyPrice'] = final_buys
+
     return data
 
 
 def get_trade_type_defaults(trade_type: str, current_atr: float, entry_price: float) -> dict:
     """Returns default ATR period, multiplier, and 1st TP calculation for the given trade type."""
     if trade_type == "A":
-        # Homerun: ATR 14, Stop 3.0×ATR, 1st TP = min(+50%, +10×ATR)
         tp_by_pct = entry_price * 1.50
         tp_by_atr = entry_price + 10 * current_atr
         first_tp = min(tp_by_pct, tp_by_atr)
         return {"period": 14, "multiplier": 3.0, "first_tp_price": first_tp, "first_tp_pct": (first_tp / entry_price) - 1}
     elif trade_type == "M":
-        # Mid-range: ATR 20, Stop 2.5×ATR, 1st TP = +27.5%
         first_tp = entry_price * 1.275
         return {"period": 20, "multiplier": 2.5, "first_tp_price": first_tp, "first_tp_pct": 0.275}
     else:
-        # Single/Bunt: ATR 22, Stop 2.0×ATR, 1st TP = +11%
         first_tp = entry_price * 1.11
         return {"period": 22, "multiplier": 2.0, "first_tp_price": first_tp, "first_tp_pct": 0.11}
 
@@ -152,9 +134,8 @@ def calculate_profit_targets(entry_price: float, first_tp_price: float, current_
     Levels 2-5: each +10% of entry_price above the previous level
     """
     targets = []
-    increment = entry_price * 0.10  # +10% of entry per subsequent level
+    increment = entry_price * 0.10
 
-    # Level 1
     sell_ratio_1 = first_tp_ratio
     targets.append(ProfitTargetLevel(
         level=1,
@@ -164,7 +145,6 @@ def calculate_profit_targets(entry_price: float, first_tp_price: float, current_
         sell_ratio=sell_ratio_1,
     ))
 
-    # Levels 2-5: sell 1/4 of remaining each time
     remaining = 1.0 - sell_ratio_1
     for lvl in range(2, 6):
         tp_price = first_tp_price + (lvl - 1) * increment
@@ -199,7 +179,6 @@ def simulate_position_sizing(
     highs = df['High'].values
     lows = df['Low'].values
 
-    # Find the start index: first date >= entry_date
     entry_dt = pd.Timestamp(entry_date)
     if dates.tz is not None:
         entry_dt = entry_dt.tz_localize(dates.tz)
@@ -209,7 +188,6 @@ def simulate_position_sizing(
             start_idx = i
             break
     else:
-        # entry_date is after all data — no simulation possible
         return sells
 
     for i in range(start_idx, len(df)):
@@ -219,7 +197,6 @@ def simulate_position_sizing(
         date_str = dates[i].strftime('%Y-%m-%d')
         stop = stop_prices[i]
 
-        # Check stop-loss first: if Low <= stop_price
         if stop > 0 and lows[i] <= stop:
             sells.append(PositionSell(
                 date=date_str,
@@ -232,7 +209,6 @@ def simulate_position_sizing(
             remaining = 0.0
             break
 
-        # Check profit targets
         while current_target_idx < len(targets) and remaining > 0.001:
             target = targets[current_target_idx]
             if highs[i] >= target.target_price:
@@ -272,7 +248,6 @@ def calculate_exit_strategy(
     stop_prices = df_analyzed['StopPrice'].values
     sells = simulate_position_sizing(df_analyzed, entry_price, entry_date, targets, stop_prices)
 
-    # Calculate weighted average sell price and total return
     weighted_avg = None
     total_return = None
     if sells:
@@ -281,7 +256,6 @@ def calculate_exit_strategy(
             weighted_avg = sum(s.price * s.ratio for s in sells) / total_sold
             total_return = (weighted_avg / entry_price - 1) * 100
 
-    # Use the latest valid trailing stop from the chart (dynamic ratchet value)
     valid_stops = df_analyzed['StopPrice'][df_analyzed['StopPrice'] > 0]
     stop_loss_price = float(valid_stops.iloc[-1]) if not valid_stops.empty else entry_price - current_atr * multiplier
 
@@ -299,13 +273,17 @@ def calculate_exit_strategy(
 
 def analyze_stock(request: AnalyzeRequest) -> AnalyzeResponse:
     df = fetch_stock_data(request.ticker, request.days, request.interval)
-    df_analyzed = calculate_atr_trailing_stop(df, request.period, request.multiplier)
 
-    # Filter for the requested 'days' (approximate slicing)
-    # Since we fetched dynamic period, let's just take the tail
-    # Assuming approx 252 trading days per year
+    # Step 1: Calculate ATR
+    df_atr = calculate_atr(df, request.period)
 
-    # Adjust slicing based on interval
+    # Step 2: Calculate Trailing Stop
+    df_stop = calculate_atr_trailing_stop(df_atr, request.period, request.multiplier)
+
+    # Step 3: Calculate Trailing Buy
+    df_analyzed = calculate_atr_trailing_buy(df_stop, request.period, request.multiplier)
+
+    # Filter for the requested 'days'
     days_per_year_approx = 252
     if request.interval == "1wk":
         days_per_year_approx = 52
@@ -313,15 +291,12 @@ def analyze_stock(request: AnalyzeRequest) -> AnalyzeResponse:
         days_per_year_approx = 12
 
     trading_days_needed = int(request.days * (days_per_year_approx/365))
-    # Ensure at least 'period' data points + some buffer, but allow full fetch if needed
-    # If the calculations are already done on the full df, we can just slice the tail to send back
-
     df_final = df_analyzed.tail(max(trading_days_needed, request.period + 10))
 
     data_points = []
     for index, row in df_final.iterrows():
-        # Handle NaN values (start of data)
         stop_price = row['StopPrice'] if not pd.isna(row['StopPrice']) and row['StopPrice'] > 0 else None
+        buy_price = row['BuyPrice'] if not pd.isna(row['BuyPrice']) and row['BuyPrice'] > 0 else None
 
         point = ChartDataPoint(
             date=index.strftime('%Y-%m-%d'),
@@ -330,7 +305,8 @@ def analyze_stock(request: AnalyzeRequest) -> AnalyzeResponse:
             low=row['Low'],
             close=row['Close'],
             volume=row['Volume'],
-            stop_price=stop_price
+            stop_price=stop_price,
+            buy_price=buy_price
         )
         data_points.append(point)
 
@@ -340,15 +316,13 @@ def analyze_stock(request: AnalyzeRequest) -> AnalyzeResponse:
     if ticker_upper.endswith(".KS") or ticker_upper.endswith(".KQ") or request.ticker.isdigit():
         currency = "KRW"
 
-    # Extract current ATR (last valid ATR value)
+    # Extract current ATR
     current_atr = 0.0
     if not df_final.empty and 'ATR' in df_final.columns:
-        # Get the last non-NaN ATR value
         atr_values = df_final['ATR'].dropna()
         if not atr_values.empty:
             current_atr = float(atr_values.iloc[-1])
 
-    # Calculate volatility amount (ATR × multiplier)
     volatility_amount = current_atr * request.multiplier
 
     # Exit strategy (optional)

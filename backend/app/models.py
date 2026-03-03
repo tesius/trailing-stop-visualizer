@@ -52,6 +52,7 @@ class ChartDataPoint(BaseModel):
     close: float
     volume: int
     stop_price: Optional[float] = None
+    buy_price: Optional[float] = None
     trend: Optional[str] = None # 'up' or 'down'
 
 class AnalyzeResponse(BaseModel):
