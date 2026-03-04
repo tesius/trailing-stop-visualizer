@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import {
     createChart,
     CandlestickSeries,
@@ -11,6 +11,8 @@ import {
     type SeriesMarker,
     type Time,
 } from 'lightweight-charts';
+import type { MAConfig, MAType } from '../utils/movingAverage';
+import { calculateMA } from '../utils/movingAverage';
 
 interface ChartDataPoint {
     date: string;
@@ -60,9 +62,14 @@ interface StockChartProps {
     onToggleStop: () => void;
     onToggleBuy: () => void;
     exitStrategy?: ExitStrategyData | null;
+    maConfigs: MAConfig[];
+    onAddMA: (type: MAType, period: number) => void;
+    onRemoveMA: (id: string) => void;
+    showBacktest: boolean;
+    onToggleBacktest: () => void;
 }
 
-const StockChart: React.FC<StockChartProps> = ({ data, ticker, currency, showStop, showBuy, onToggleStop, onToggleBuy, exitStrategy }) => {
+const StockChart: React.FC<StockChartProps> = ({ data, ticker, currency, showStop, showBuy, onToggleStop, onToggleBuy, exitStrategy, maConfigs, onAddMA, onRemoveMA, showBacktest, onToggleBacktest }) => {
     const chartContainerRef = useRef<HTMLDivElement>(null);
     const chartRef = useRef<IChartApi | null>(null);
     const candleSeriesRef = useRef<ISeriesApi<'Candlestick'> | null>(null);
@@ -72,6 +79,12 @@ const StockChart: React.FC<StockChartProps> = ({ data, ticker, currency, showSto
     const sellMarkersRef = useRef<ReturnType<typeof createSeriesMarkers<Time>> | null>(null);
     const buyMarkersRef = useRef<ReturnType<typeof createSeriesMarkers<Time>> | null>(null);
     const exitMarkersRef = useRef<ReturnType<typeof createSeriesMarkers<Time>> | null>(null);
+    const maSeriesMapRef = useRef<Map<string, ISeriesApi<'Line'>>>(new Map());
+
+    const [maDropdownOpen, setMaDropdownOpen] = useState(false);
+    const [maType, setMaType] = useState<MAType>('SMA');
+    const [maPeriod, setMaPeriod] = useState(20);
+    const maDropdownRef = useRef<HTMLDivElement>(null);
 
     const formatCurrency = (value: number) => {
         const symbol = currency === 'KRW' ? '₩' : '$';
@@ -105,6 +118,7 @@ const StockChart: React.FC<StockChartProps> = ({ data, ticker, currency, showSto
             },
             localization: {
                 priceFormatter: formatCurrency,
+                dateFormat: 'yyyy.MM.dd',
             },
         });
 
@@ -290,6 +304,65 @@ const StockChart: React.FC<StockChartProps> = ({ data, ticker, currency, showSto
         chartRef.current?.timeScale().fitContent();
     }, [data, showStop, showBuy, exitStrategy]);
 
+    // MA series management
+    useEffect(() => {
+        const chart = chartRef.current;
+        if (!chart || !data.length) return;
+
+        const closes = data.map(d => ({ time: d.date, value: d.close }));
+        const currentIds = new Set(maConfigs.map(c => c.id));
+        const map = maSeriesMapRef.current;
+
+        // Remove series no longer in config
+        for (const [id, series] of map) {
+            if (!currentIds.has(id)) {
+                chart.removeSeries(series);
+                map.delete(id);
+            }
+        }
+
+        // Add or update series
+        for (const config of maConfigs) {
+            let series = map.get(config.id);
+            if (!series) {
+                series = chart.addSeries(LineSeries, {
+                    color: config.color,
+                    lineWidth: 1,
+                    lineStyle: LineStyle.Solid,
+                    crosshairMarkerVisible: false,
+                    lastValueVisible: false,
+                    priceLineVisible: false,
+                });
+                map.set(config.id, series);
+            } else {
+                series.applyOptions({ color: config.color });
+            }
+            const maData = calculateMA(closes, config).map(d => ({
+                time: d.time as Time,
+                value: d.value,
+            }));
+            series.setData(maData);
+        }
+    }, [data, maConfigs]);
+
+    // Close MA dropdown on outside click
+    useEffect(() => {
+        const handler = (e: MouseEvent) => {
+            if (maDropdownRef.current && !maDropdownRef.current.contains(e.target as Node)) {
+                setMaDropdownOpen(false);
+            }
+        };
+        document.addEventListener('mousedown', handler);
+        return () => document.removeEventListener('mousedown', handler);
+    }, []);
+
+    const handleAddMASubmit = () => {
+        if (maPeriod > 0) {
+            onAddMA(maType, maPeriod);
+            setMaDropdownOpen(false);
+        }
+    };
+
     return (
         <div className="bg-white/[0.04] backdrop-blur-xl border border-white/[0.06] rounded-2xl p-4 md:p-6 animate-fade-in-up">
             {/* Header with ticker and toggles */}
@@ -318,6 +391,91 @@ const StockChart: React.FC<StockChartProps> = ({ data, ticker, currency, showSto
                         <span className={`w-2 h-2 rounded-full ${showBuy ? 'bg-amber-400' : 'bg-gray-600'}`} />
                         Buy
                     </button>
+
+                    <span className="w-px h-5 bg-white/10" />
+                    <button
+                        onClick={onToggleBacktest}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
+                            showBacktest
+                                ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30'
+                                : 'bg-white/[0.04] text-gray-500 border border-white/[0.06]'
+                        }`}
+                    >
+                        <span className={`w-2 h-2 rounded-full ${showBacktest ? 'bg-cyan-400' : 'bg-gray-600'}`} />
+                        Backtest
+                    </button>
+
+                    {maConfigs.length > 0 && (
+                        <span className="w-px h-5 bg-white/10" />
+                    )}
+
+                    {maConfigs.map(c => (
+                        <span
+                            key={c.id}
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border border-white/10 bg-white/[0.04] text-gray-300"
+                        >
+                            <span className="w-2 h-2 rounded-full" style={{ backgroundColor: c.color }} />
+                            {c.type} {c.period}
+                            <button
+                                onClick={() => onRemoveMA(c.id)}
+                                className="ml-0.5 text-gray-500 hover:text-white transition-colors"
+                            >
+                                &times;
+                            </button>
+                        </span>
+                    ))}
+
+                    <div className="relative" ref={maDropdownRef}>
+                        <button
+                            onClick={() => setMaDropdownOpen(o => !o)}
+                            disabled={maConfigs.length >= 3}
+                            className={`flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-medium transition-all border ${
+                                maConfigs.length >= 3
+                                    ? 'bg-white/[0.02] text-gray-600 border-white/[0.04] cursor-not-allowed'
+                                    : 'bg-white/[0.04] text-gray-400 border-white/[0.06] hover:text-white hover:border-white/20'
+                            }`}
+                        >
+                            + MA
+                        </button>
+                        {maDropdownOpen && (
+                            <div className="absolute right-0 top-full mt-2 z-50 bg-gray-900 border border-white/10 rounded-xl p-3 shadow-xl min-w-[180px]">
+                                <div className="flex gap-2 mb-2">
+                                    <button
+                                        onClick={() => setMaType('SMA')}
+                                        className={`flex-1 px-2 py-1 rounded text-xs font-medium transition-all ${
+                                            maType === 'SMA' ? 'bg-white/10 text-white' : 'text-gray-400 hover:text-white'
+                                        }`}
+                                    >
+                                        SMA
+                                    </button>
+                                    <button
+                                        onClick={() => setMaType('EMA')}
+                                        className={`flex-1 px-2 py-1 rounded text-xs font-medium transition-all ${
+                                            maType === 'EMA' ? 'bg-white/10 text-white' : 'text-gray-400 hover:text-white'
+                                        }`}
+                                    >
+                                        EMA
+                                    </button>
+                                </div>
+                                <input
+                                    type="number"
+                                    min={1}
+                                    max={500}
+                                    value={maPeriod}
+                                    onChange={e => setMaPeriod(Number(e.target.value))}
+                                    onKeyDown={e => e.key === 'Enter' && handleAddMASubmit()}
+                                    className="w-full px-2 py-1.5 mb-2 rounded bg-white/[0.06] border border-white/10 text-white text-xs focus:outline-none focus:border-white/30"
+                                    placeholder="Period"
+                                />
+                                <button
+                                    onClick={handleAddMASubmit}
+                                    className="w-full px-2 py-1.5 rounded bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 text-xs font-medium hover:bg-indigo-500/30 transition-all"
+                                >
+                                    Add {maType} {maPeriod}
+                                </button>
+                            </div>
+                        )}
+                    </div>
                 </div>
             </div>
             <div ref={chartContainerRef} className="h-[350px] md:h-[500px]" />
