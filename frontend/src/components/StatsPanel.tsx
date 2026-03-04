@@ -68,7 +68,7 @@ const StatsPanel: React.FC<StatsPanelProps> = ({ data, ticker, currency, showSto
     const visibleCards = cards.filter(c => c.show);
 
     return (
-        <div className={`grid gap-4 animate-fade-in-up ${
+        <div className={`grid gap-2 sm:gap-4 animate-fade-in-up ${
             visibleCards.length <= 2 ? 'grid-cols-2' :
             visibleCards.length === 3 ? 'grid-cols-2 md:grid-cols-3' :
             'grid-cols-2 md:grid-cols-4'
@@ -76,12 +76,12 @@ const StatsPanel: React.FC<StatsPanelProps> = ({ data, ticker, currency, showSto
             {visibleCards.map((card) => (
                 <div
                     key={card.label}
-                    className="bg-white/[0.04] backdrop-blur-xl border border-white/[0.06] rounded-xl p-4"
+                    className="bg-white/[0.04] backdrop-blur-xl border border-white/[0.06] rounded-xl p-3 sm:p-4"
                 >
                     <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">
                         {card.label}
                     </p>
-                    <p className={`text-xl font-bold ${card.color} font-mono`}>
+                    <p className={`text-lg sm:text-xl font-bold ${card.color} font-mono`}>
                         {card.value}
                     </p>
                     {card.sub && (

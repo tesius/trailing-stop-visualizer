@@ -293,7 +293,7 @@ const StockChart: React.FC<StockChartProps> = ({ data, ticker, currency, showSto
     return (
         <div className="bg-white/[0.04] backdrop-blur-xl border border-white/[0.06] rounded-2xl p-4 md:p-6 animate-fade-in-up">
             {/* Header with ticker and toggles */}
-            <div className="flex items-center justify-between mb-4">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-4">
                 <h2 className="text-lg font-semibold text-white">{ticker.toUpperCase()} Analysis</h2>
                 <div className="flex items-center gap-2">
                     <button

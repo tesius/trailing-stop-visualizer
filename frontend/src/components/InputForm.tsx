@@ -103,7 +103,7 @@ const InputForm: React.FC<InputFormProps> = ({ onAnalyze, isLoading }) => {
     return (
         <form onSubmit={handleSubmit} className="bg-white/[0.04] backdrop-blur-xl border border-white/[0.06] p-5 rounded-2xl space-y-4">
             {/* Row 1: Inputs + Button */}
-            <div className="grid grid-cols-2 md:grid-cols-[1fr_auto_80px_90px_auto] gap-3 items-end">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-[1fr_auto_80px_90px_auto] gap-3 items-end">
                 {/* Ticker */}
                 <div className="flex flex-col gap-1.5">
                     <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Ticker</label>
@@ -163,7 +163,7 @@ const InputForm: React.FC<InputFormProps> = ({ onAnalyze, isLoading }) => {
                 </div>
 
                 {/* Analyze Button */}
-                <div className="flex flex-col justify-end col-span-2 md:col-span-1">
+                <div className="flex flex-col justify-end col-span-1 sm:col-span-2 md:col-span-1">
                     <button
                         type="submit"
                         disabled={isLoading}
@@ -204,7 +204,7 @@ const InputForm: React.FC<InputFormProps> = ({ onAnalyze, isLoading }) => {
             </div>
 
             {/* Row 3: Exit Strategy */}
-            <div className="flex flex-wrap gap-3 items-end pt-2 border-t border-white/[0.06]">
+            <div className="flex flex-col sm:flex-row sm:flex-wrap gap-3 items-stretch sm:items-end pt-2 border-t border-white/[0.06]">
                 {/* Trade Type Toggle */}
                 <div className="flex flex-col gap-1.5">
                     <label className="text-[10px] font-bold text-purple-400 uppercase tracking-wider">Trade Type</label>
@@ -228,7 +228,7 @@ const InputForm: React.FC<InputFormProps> = ({ onAnalyze, isLoading }) => {
 
                 {tradeType && (
                     <>
-                        <div className="flex flex-col gap-1.5 w-32">
+                        <div className="flex flex-col gap-1.5 w-full sm:w-32">
                             <label className="text-[10px] font-bold text-purple-400 uppercase tracking-wider">Entry Price</label>
                             <input
                                 type="number"
@@ -241,7 +241,7 @@ const InputForm: React.FC<InputFormProps> = ({ onAnalyze, isLoading }) => {
                             />
                         </div>
 
-                        <div className="flex flex-col gap-1.5 min-w-[180px]">
+                        <div className="flex flex-col gap-1.5 w-full sm:min-w-[180px]">
                             <label className="text-[10px] font-bold text-purple-400 uppercase tracking-wider">Entry Date</label>
                             <input
                                 type="date"

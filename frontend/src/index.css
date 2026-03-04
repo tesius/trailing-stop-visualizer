@@ -6,6 +6,7 @@ body,
   height: 100%;
   margin: 0;
   background-color: #030712;
+  overflow-x: hidden;
 }
 
 /* Hide spin buttons for chrome/safari/edge */

@@ -46,26 +46,26 @@ export default function ExitStrategyInfo({ data, currency }: ExitStrategyInfoPro
     return (
         <div className="bg-white/10 backdrop-blur-md border border-white/20 p-5 rounded-2xl shadow-xl mt-6 w-full max-w-6xl mx-auto">
             {/* Header */}
-            <div className="flex flex-wrap gap-6 items-center mb-4">
+            <div className="flex flex-wrap gap-3 sm:gap-6 items-center mb-4">
                 <div>
                     <span className="text-[10px] font-bold text-purple-300 uppercase tracking-wider">Type</span>
                     <p className="text-white text-lg font-semibold">
                         {data.trade_type} <span className="text-purple-300 text-sm">({TRADE_TYPE_LABELS[data.trade_type] ?? data.trade_type})</span>
                     </p>
                 </div>
-                <div className="w-px h-8 bg-white/20" />
+                <div className="w-px h-8 bg-white/20 hidden sm:block" />
                 <div>
                     <span className="text-[10px] font-bold text-purple-300 uppercase tracking-wider">Entry</span>
                     <p className="text-white text-lg font-semibold font-mono">{fmt(data.entry_price)}</p>
                 </div>
-                <div className="w-px h-8 bg-white/20" />
+                <div className="w-px h-8 bg-white/20 hidden sm:block" />
                 <div>
                     <span className="text-[10px] font-bold text-red-400 uppercase tracking-wider">Stop Loss</span>
                     <p className="text-red-400 text-lg font-semibold font-mono">{fmt(data.stop_loss_price)}</p>
                 </div>
                 {data.weighted_avg_sell_price !== null && (
                     <>
-                        <div className="w-px h-8 bg-white/20" />
+                        <div className="w-px h-8 bg-white/20 hidden sm:block" />
                         <div>
                             <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider">Avg Sell</span>
                             <p className="text-emerald-400 text-lg font-semibold font-mono">{fmt(data.weighted_avg_sell_price)}</p>
@@ -74,7 +74,7 @@ export default function ExitStrategyInfo({ data, currency }: ExitStrategyInfoPro
                 )}
                 {data.total_return_pct !== null && (
                     <>
-                        <div className="w-px h-8 bg-white/20" />
+                        <div className="w-px h-8 bg-white/20 hidden sm:block" />
                         <div>
                             <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider">Total Return</span>
                             <p className={`text-lg font-semibold font-mono ${data.total_return_pct >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
@@ -122,10 +122,10 @@ export default function ExitStrategyInfo({ data, currency }: ExitStrategyInfoPro
                         {data.sells.map((s, i) => (
                             <div
                                 key={i}
-                                className={`flex items-center gap-3 text-sm px-3 py-1.5 rounded-lg ${s.level === 0 ? 'bg-red-500/10 border border-red-500/20' : 'bg-purple-500/10 border border-purple-500/20'
+                                className={`flex flex-wrap items-center gap-3 text-xs sm:text-sm px-3 py-1.5 rounded-lg ${s.level === 0 ? 'bg-red-500/10 border border-red-500/20' : 'bg-purple-500/10 border border-purple-500/20'
                                     }`}
                             >
-                                <span className="text-gray-400 font-mono text-xs w-24">{s.date}</span>
+                                <span className="text-gray-400 font-mono text-xs w-20 sm:w-24">{s.date}</span>
                                 <span className={`font-semibold ${s.level === 0 ? 'text-red-400' : 'text-purple-300'}`}>
                                     {s.label}
                                 </span>
