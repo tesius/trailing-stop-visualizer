@@ -1,0 +1,7 @@
+services:
+  app:
+    build: .
+    container_name: trailing-stop
+    restart: unless-stopped
+    ports:
+      - "3002:3000"
