@@ -14,6 +14,40 @@ import {
 import type { MAConfig, MAType } from '../utils/movingAverage';
 import { calculateMA } from '../utils/movingAverage';
 
+const RANGE_PRESETS = [
+    { key: '1M', label: '1M', days: 30 },
+    { key: '3M', label: '3M', days: 90 },
+    { key: '6M', label: '6M', days: 180 },
+    { key: '1Y', label: '1Y', days: 365 },
+    { key: 'All', label: 'All', days: 0 },
+] as const;
+
+type RangeKey = typeof RANGE_PRESETS[number]['key'];
+
+// preset에 맞춰 차트 가시 범위를 설정한다. 전체 데이터는 로드된 상태로
+// 최근 N일만 보이도록 하고, All이면 fitContent.
+function applyVisibleRange(chart: IChartApi, data: { date: string }[], preset: RangeKey) {
+    if (!data.length) return;
+    const days = RANGE_PRESETS.find(p => p.key === preset)?.days ?? 0;
+    if (days === 0) {
+        chart.timeScale().fitContent();
+        return;
+    }
+    const lastDate = new Date(data[data.length - 1].date);
+    const fromDate = new Date(lastDate);
+    fromDate.setDate(fromDate.getDate() - days);
+    const fromTime = fromDate.getTime();
+    const fromPoint = data.find(d => new Date(d.date).getTime() >= fromTime);
+    if (!fromPoint) {
+        chart.timeScale().fitContent();
+        return;
+    }
+    chart.timeScale().setVisibleRange({
+        from: fromPoint.date as Time,
+        to: data[data.length - 1].date as Time,
+    });
+}
+
 interface ChartDataPoint {
     date: string;
     open: number;
@@ -81,6 +115,7 @@ const StockChart: React.FC<StockChartProps> = ({ data, ticker, currency, showSto
     const exitMarkersRef = useRef<ReturnType<typeof createSeriesMarkers<Time>> | null>(null);
     const maSeriesMapRef = useRef<Map<string, ISeriesApi<'Line'>>>(new Map());
 
+    const [rangePreset, setRangePreset] = useState<RangeKey>('1M');
     const [maDropdownOpen, setMaDropdownOpen] = useState(false);
     const [maType, setMaType] = useState<MAType>('SMA');
     const [maPeriod, setMaPeriod] = useState(20);
@@ -300,9 +335,11 @@ const StockChart: React.FC<StockChartProps> = ({ data, ticker, currency, showSto
             exitMarkersRef.current.setMarkers([]);
         }
 
-        // Fit content
-        chartRef.current?.timeScale().fitContent();
-    }, [data, showStop, showBuy, exitStrategy]);
+        // 기본 가시 범위 적용 (최근 1개월 등)
+        if (chartRef.current) {
+            applyVisibleRange(chartRef.current, data, rangePreset);
+        }
+    }, [data, showStop, showBuy, exitStrategy, rangePreset]);
 
     // MA series management
     useEffect(() => {
@@ -368,7 +405,24 @@ const StockChart: React.FC<StockChartProps> = ({ data, ticker, currency, showSto
             {/* Header with ticker and toggles */}
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-4">
                 <h2 className="text-lg font-semibold text-white">{ticker.toUpperCase()} Analysis</h2>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
+                    {/* Range preset */}
+                    <div className="flex bg-white/[0.04] rounded-full p-1 border border-white/[0.08]">
+                        {RANGE_PRESETS.map((p) => (
+                            <button
+                                key={p.key}
+                                onClick={() => setRangePreset(p.key)}
+                                className={`px-2.5 py-1 rounded-full text-xs font-medium transition-all ${
+                                    rangePreset === p.key
+                                        ? 'bg-blue-600 text-white shadow-sm'
+                                        : 'text-gray-500 hover:text-gray-300'
+                                }`}
+                            >
+                                {p.label}
+                            </button>
+                        ))}
+                    </div>
+                    <span className="w-px h-5 bg-white/10" />
                     <button
                         onClick={onToggleStop}
                         className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${

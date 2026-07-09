@@ -65,3 +65,35 @@ class AnalyzeResponse(BaseModel):
     volatility_amount: float
     data: List[ChartDataPoint]
     exit_strategy: Optional[ExitStrategyData] = None
+
+# ---- 보유 종목 (Portfolio Holdings) ----
+
+class Holding(BaseModel):
+    id: str
+    ticker: str
+    alias: Optional[str] = None
+    memo: Optional[str] = None
+    period: int = 14
+    multiplier: float = 2.5
+    interval: str = "1d"      # 1d / 1wk / 1mo
+    days: int = 365           # 조회 히스토리 폭
+    order: int = 0            # 탭 정렬 순서
+
+class HoldingCreate(BaseModel):
+    ticker: str
+    alias: Optional[str] = None
+    memo: Optional[str] = None
+    period: int = 14
+    multiplier: float = 2.5
+    interval: str = "1d"
+    days: int = 365
+
+class HoldingUpdate(BaseModel):
+    ticker: Optional[str] = None
+    alias: Optional[str] = None
+    memo: Optional[str] = None
+    period: Optional[int] = None
+    multiplier: Optional[float] = None
+    interval: Optional[str] = None
+    days: Optional[int] = None
+    order: Optional[int] = None

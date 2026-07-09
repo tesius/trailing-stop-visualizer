@@ -16,6 +16,46 @@ export interface ExitStrategyParams {
     first_tp_ratio?: number;
 }
 
+// ---- 보유 종목 (Portfolio Holdings) ----
+
+export interface Holding {
+    id: string;
+    ticker: string;
+    alias?: string | null;
+    memo?: string | null;
+    period: number;
+    multiplier: number;
+    interval: string;
+    days: number;
+    order: number;
+}
+
+export type HoldingInput = Omit<Holding, 'id' | 'order'>;
+
+export const getHoldings = async (): Promise<Holding[]> => {
+    const response = await client.get('/holdings');
+    return response.data;
+};
+
+export const createHolding = async (payload: Partial<HoldingInput> & { ticker: string }): Promise<Holding> => {
+    const response = await client.post('/holdings', payload);
+    return response.data;
+};
+
+export const updateHolding = async (id: string, payload: Partial<HoldingInput>): Promise<Holding> => {
+    const response = await client.put(`/holdings/${id}`, payload);
+    return response.data;
+};
+
+export const deleteHolding = async (id: string): Promise<void> => {
+    await client.delete(`/holdings/${id}`);
+};
+
+export const reorderHoldings = async (ids: string[]): Promise<Holding[]> => {
+    const response = await client.put('/holdings/order', { ids });
+    return response.data;
+};
+
 export const analyzeStock = async (
     ticker: string,
     period: number,

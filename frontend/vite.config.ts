@@ -8,6 +8,7 @@ export default defineConfig({
   server: {
     proxy: {
       '/analyze': 'http://localhost:8000',
+      '/holdings': 'http://localhost:8000',
     },
   },
 })

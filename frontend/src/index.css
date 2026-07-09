@@ -37,6 +37,15 @@ input[type=number] {
   animation: fadeInUp 0.5s ease-out both;
 }
 
+/* Hide scrollbar (holdings 탭 가로 스크롤) */
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
 @keyframes shimmer {
   0% {
     background-position: -200% 0;

@@ -5,3 +5,10 @@ services:
     restart: unless-stopped
     ports:
       - "3002:3000"
+    environment:
+      - DATA_DIR=/app/data
+    volumes:
+      - trailing-stop-data:/app/data
+
+volumes:
+  trailing-stop-data:
