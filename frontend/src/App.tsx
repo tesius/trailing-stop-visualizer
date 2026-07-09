@@ -28,18 +28,11 @@ function App() {
   const [showBacktest, setShowBacktest] = useState(false);
   const [maConfigs, setMAConfigs] = useState<MAConfig[]>([]);
 
-  const activeHolding = holdings.find(h => h.id === activeId) ?? null;
-
-  // 활성 종목이 목록에서 사라지거나 아직 없을 때 첫 종목으로 폴백
-  useEffect(() => {
-    if (holdings.length === 0) {
-      if (activeId !== null) setActiveId(null);
-      return;
-    }
-    if (!activeId || !holdings.some(h => h.id === activeId)) {
-      setActiveId(holdings[0].id);
-    }
-  }, [holdings, activeId]);
+  // 활성 종목은 파생값으로 계산한다. activeId가 아직 갱신되지 않은 목록에
+  // 없더라도(추가 직후 refetch 대기 등) 첫 종목으로 폴백해 항상 그래프가 뜨고,
+  // 목록에 새 id가 들어오면 자동으로 그 종목으로 전환된다.
+  // (effect로 activeId를 되돌리면 추가한 종목이 첫 종목으로 덮이는 경쟁 조건 발생)
+  const activeHolding = holdings.find(h => h.id === activeId) ?? holdings[0] ?? null;
 
   // localStorage 최근 검색 이력 → 포트폴리오 1회 마이그레이션
   const seededRef = useRef(false);
@@ -116,7 +109,7 @@ function App() {
         <div className="max-w-[1600px] mx-auto mb-6">
           <HoldingTabs
             holdings={holdings}
-            activeId={activeId}
+            activeId={activeHolding?.id ?? null}
             onSelect={setActiveId}
             onEdit={(h) => setModal({ holding: h })}
             onAdd={() => setModal({ holding: null })}
