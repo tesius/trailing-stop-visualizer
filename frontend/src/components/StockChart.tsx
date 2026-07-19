@@ -126,6 +126,7 @@ const StockChart: React.FC<StockChartProps> = ({ data, ticker, currency, showSto
     const maSeriesMapRef = useRef<Map<string, ISeriesApi<'Line'>>>(new Map());
 
     const [rangePreset, setRangePreset] = useState<RangeKey>('3M');
+    const [interactive, setInteractive] = useState(false);
     const [maDropdownOpen, setMaDropdownOpen] = useState(false);
     const [maType, setMaType] = useState<MAType>('SMA');
     const [maPeriod, setMaPeriod] = useState(20);
@@ -165,6 +166,10 @@ const StockChart: React.FC<StockChartProps> = ({ data, ticker, currency, showSto
                 priceFormatter: formatCurrency,
                 dateFormat: 'yyyy.MM.dd',
             },
+            // 기본은 상호작용 비활성 → 차트 위 스크롤이 페이지 스크롤로 동작.
+            // '편집' 토글을 켜면 확대/축소·이동 활성화 (아래 effect에서 제어).
+            handleScroll: false,
+            handleScale: false,
         });
 
         const candleSeries = chart.addSeries(CandlestickSeries, {
@@ -479,6 +484,16 @@ const StockChart: React.FC<StockChartProps> = ({ data, ticker, currency, showSto
         }
     }, [data, maConfigs]);
 
+    // '편집' 토글에 따라 스크롤/확대축소 상호작용 on/off
+    useEffect(() => {
+        const chart = chartRef.current;
+        if (!chart) return;
+        chart.applyOptions({
+            handleScroll: interactive,
+            handleScale: interactive,
+        });
+    }, [interactive]);
+
     // Close MA dropdown on outside click
     useEffect(() => {
         const handler = (e: MouseEvent) => {
@@ -519,6 +534,22 @@ const StockChart: React.FC<StockChartProps> = ({ data, ticker, currency, showSto
                             </button>
                         ))}
                     </div>
+                    <span className="w-px h-5 bg-white/10" />
+                    <button
+                        onClick={() => setInteractive(v => !v)}
+                        title={interactive ? '편집 모드 켜짐 — 스크롤로 확대/축소·이동' : '편집 모드 꺼짐 — 스크롤 시 페이지 이동'}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
+                            interactive
+                                ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
+                                : 'bg-white/[0.04] text-gray-500 border border-white/[0.06]'
+                        }`}
+                    >
+                        <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <path d="M12 20h9" />
+                            <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
+                        </svg>
+                        편집
+                    </button>
                     <span className="w-px h-5 bg-white/10" />
                     <button
                         onClick={onToggleStop}
@@ -629,7 +660,12 @@ const StockChart: React.FC<StockChartProps> = ({ data, ticker, currency, showSto
                     </div>
                 </div>
             </div>
-            <div ref={chartContainerRef} className="h-[520px] md:h-[720px]" />
+            <div
+                ref={chartContainerRef}
+                className={`h-[520px] md:h-[720px] rounded-lg transition-shadow ${
+                    interactive ? 'ring-1 ring-blue-500/40' : ''
+                }`}
+            />
         </div>
     );
 };
