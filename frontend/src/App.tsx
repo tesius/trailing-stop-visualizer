@@ -2,23 +2,26 @@ import { useState, useMemo, useEffect, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import Header from './components/Header';
 import Footer from './components/Footer';
-import HoldingTabs from './components/HoldingTabs';
+import WatchlistSidebar from './components/WatchlistSidebar';
 import HoldingModal from './components/HoldingModal';
 import StockChart from './components/StockChart';
 import StatsPanel from './components/StatsPanel';
 import ATRInfo from './components/ATRInfo';
+import AiInterpretation from './components/AiInterpretation';
 import BacktestPanel from './components/BacktestPanel';
 import ErrorBanner from './components/ErrorBanner';
 import LoadingSkeleton from './components/LoadingSkeleton';
 import { analyzeStock } from './api/client';
 import type { Holding, HoldingInput } from './api/client';
 import { useHoldings } from './hooks/useHoldings';
+import { useQuotes } from './hooks/useQuotes';
 import { runBacktest } from './utils/backtest';
 import type { MAConfig, MAType } from './utils/movingAverage';
 import { MA_COLORS } from './utils/movingAverage';
 
 function App() {
   const { holdings, isLoading: holdingsLoading, create, update, remove } = useHoldings();
+  const { quotes, isLoading: quotesLoading } = useQuotes(holdings.map(h => h.ticker));
 
   const [activeId, setActiveId] = useState<string | null>(null);
   const [modal, setModal] = useState<{ holding: Holding | null } | null>(null);
@@ -105,76 +108,79 @@ function App() {
       <Header />
 
       <main className="flex-1 px-4 pb-8">
-        {/* Holding tabs */}
-        <div className="max-w-[1600px] mx-auto mb-6">
-          <HoldingTabs
+        <div className="max-w-[1600px] mx-auto flex flex-col lg:flex-row gap-6">
+          {/* Watchlist sidebar */}
+          <WatchlistSidebar
             holdings={holdings}
+            quotes={quotes}
+            quotesLoading={quotesLoading}
             activeId={activeHolding?.id ?? null}
             onSelect={setActiveId}
             onEdit={(h) => setModal({ holding: h })}
             onAdd={() => setModal({ holding: null })}
           />
-        </div>
 
-        {/* Results */}
-        <div className="max-w-[1600px] mx-auto space-y-6">
-          {/* 종목이 하나도 없을 때 */}
-          {!holdingsLoading && holdings.length === 0 && (
-            <div className="text-center py-24 animate-fade-in-up">
-              <p className="text-gray-400 mb-4">등록된 보유 종목이 없습니다.</p>
-              <button
-                onClick={() => setModal({ holding: null })}
-                className="bg-blue-600 hover:bg-blue-500 text-white font-semibold py-2.5 px-6 rounded-lg transition-all text-sm"
-              >
-                + 첫 종목 추가하기
-              </button>
-            </div>
-          )}
+          {/* Detail column */}
+          <div className="flex-1 min-w-0 space-y-6">
+            {/* 종목이 하나도 없을 때 */}
+            {!holdingsLoading && holdings.length === 0 && (
+              <div className="text-center py-24 animate-fade-in-up">
+                <p className="text-gray-400 mb-4">등록된 보유 종목이 없습니다.</p>
+                <button
+                  onClick={() => setModal({ holding: null })}
+                  className="bg-blue-600 hover:bg-blue-500 text-white font-semibold py-2.5 px-6 rounded-lg transition-all text-sm"
+                >
+                  + 첫 종목 추가하기
+                </button>
+              </div>
+            )}
 
-          {error && <ErrorBanner error={error as Error & { response?: { data?: { detail?: string } } }} />}
+            {error && <ErrorBanner error={error as Error & { response?: { data?: { detail?: string } } }} />}
 
-          {activeHolding && isLoading && <LoadingSkeleton />}
+            {activeHolding && isLoading && <LoadingSkeleton />}
 
-          {activeHolding && data && !isLoading && (
-            <>
-              <StatsPanel
-                data={data.data}
-                ticker={data.ticker}
-                currency={data.currency}
-                showStop={showStop}
-                showBuy={showBuy}
-              />
-              <ATRInfo
-                currentAtr={data.current_atr}
-                volatilityAmount={data.volatility_amount}
-                multiplier={activeHolding.multiplier}
-                currency={data.currency}
-              />
-              {activeHolding.memo && (
-                <div className="bg-white/[0.04] border border-white/[0.06] rounded-2xl px-5 py-3 text-sm text-gray-300">
-                  <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mr-2">Memo</span>
-                  {activeHolding.memo}
-                </div>
-              )}
-              <StockChart
-                data={data.data}
-                ticker={data.ticker}
-                currency={data.currency}
-                showStop={showStop}
-                showBuy={showBuy}
-                onToggleStop={() => setShowStop(s => !s)}
-                onToggleBuy={() => setShowBuy(b => !b)}
-                maConfigs={maConfigs}
-                onAddMA={handleAddMA}
-                onRemoveMA={handleRemoveMA}
-                showBacktest={showBacktest}
-                onToggleBacktest={() => setShowBacktest(b => !b)}
-              />
-              {showBacktest && backtestResult && (
-                <BacktestPanel result={backtestResult} />
-              )}
-            </>
-          )}
+            {activeHolding && data && !isLoading && (
+              <>
+                <StatsPanel
+                  data={data.data}
+                  ticker={data.ticker}
+                  currency={data.currency}
+                  showStop={showStop}
+                  showBuy={showBuy}
+                />
+                <ATRInfo
+                  currentAtr={data.current_atr}
+                  volatilityAmount={data.volatility_amount}
+                  multiplier={activeHolding.multiplier}
+                  currency={data.currency}
+                />
+                {activeHolding.memo && (
+                  <div className="bg-white/[0.04] border border-white/[0.06] rounded-2xl px-5 py-3 text-sm text-gray-300">
+                    <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mr-2">Memo</span>
+                    {activeHolding.memo}
+                  </div>
+                )}
+                <StockChart
+                  data={data.data}
+                  ticker={data.ticker}
+                  currency={data.currency}
+                  showStop={showStop}
+                  showBuy={showBuy}
+                  onToggleStop={() => setShowStop(s => !s)}
+                  onToggleBuy={() => setShowBuy(b => !b)}
+                  maConfigs={maConfigs}
+                  onAddMA={handleAddMA}
+                  onRemoveMA={handleRemoveMA}
+                  showBacktest={showBacktest}
+                  onToggleBacktest={() => setShowBacktest(b => !b)}
+                />
+                <AiInterpretation data={data} />
+                {showBacktest && backtestResult && (
+                  <BacktestPanel result={backtestResult} />
+                )}
+              </>
+            )}
+          </div>
         </div>
       </main>
 

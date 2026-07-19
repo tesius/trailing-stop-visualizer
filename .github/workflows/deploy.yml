@@ -10,6 +10,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Build and deploy
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
           export PATH="/opt/homebrew/bin:$PATH"
           docker compose build

@@ -1,9 +1,36 @@
 from fastapi import APIRouter, HTTPException, Query
-from typing import Optional
-from app.models import AnalyzeRequest, AnalyzeResponse
-from app.services import analyze_stock
+from typing import List, Optional
+from app.models import AnalyzeRequest, AnalyzeResponse, QuoteData, InterpretRequest, InterpretResponse
+from app.services import analyze_stock, fetch_quotes
+from app.ai import interpret_indicators
 
 router = APIRouter()
+
+
+@router.post("/interpret", response_model=InterpretResponse)
+async def interpret_endpoint(request: InterpretRequest):
+    """지표 스냅샷을 Gemini Flash로 해석 (온디맨드, 서버 캐시)."""
+    try:
+        return interpret_indicators(request)
+    except RuntimeError as e:
+        # 키 미설정 등 예상된 실패 → 503
+        raise HTTPException(status_code=503, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"AI 해석 실패: {e}")
+
+
+@router.get("/quotes", response_model=List[QuoteData])
+async def quotes_endpoint(
+    tickers: str = Query(..., description="Comma-separated tickers, e.g. AAPL,TSLA,005930"),
+):
+    """워치리스트 요약 (price, change%, RSI, MACD 방향). 서버 캐시 TTL 45초."""
+    symbols = [t.strip() for t in tickers.split(",") if t.strip()]
+    if not symbols:
+        return []
+    try:
+        return fetch_quotes(symbols)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/analyze", response_model=AnalyzeResponse)
 async def analyze_endpoint(

@@ -16,6 +16,51 @@ export interface ExitStrategyParams {
     first_tp_ratio?: number;
 }
 
+// ---- 워치리스트 요약 (Quotes) ----
+
+export interface QuoteData {
+    ticker: string;
+    price: number | null;
+    change_pct: number | null;
+    rsi: number | null;
+    macd_hist: number | null;
+    currency: string;
+    error: string | null;
+}
+
+export const getQuotes = async (tickers: string[]): Promise<QuoteData[]> => {
+    if (tickers.length === 0) return [];
+    const response = await client.get('/quotes', { params: { tickers: tickers.join(',') } });
+    return response.data;
+};
+
+// ---- AI 지표 해석 (Gemini) ----
+
+export interface InterpretPayload {
+    ticker: string;
+    currency: string;
+    date: string;
+    price: number;
+    rsi?: number | null;
+    macd?: number | null;
+    macd_signal?: number | null;
+    macd_hist?: number | null;
+    stop_price?: number | null;
+    buy_price?: number | null;
+}
+
+export interface InterpretResult {
+    ticker: string;
+    interpretation: string;
+    model: string;
+    cached: boolean;
+}
+
+export const interpretIndicators = async (payload: InterpretPayload): Promise<InterpretResult> => {
+    const response = await client.post('/interpret', payload);
+    return response.data;
+};
+
 // ---- 보유 종목 (Portfolio Holdings) ----
 
 export interface Holding {

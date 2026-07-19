@@ -54,6 +54,39 @@ class ChartDataPoint(BaseModel):
     stop_price: Optional[float] = None
     buy_price: Optional[float] = None
     trend: Optional[str] = None # 'up' or 'down'
+    rsi: Optional[float] = None
+    macd: Optional[float] = None
+    macd_signal: Optional[float] = None
+    macd_hist: Optional[float] = None
+
+class InterpretRequest(BaseModel):
+    """지표 AI 해석 요청 — 프론트가 /analyze에서 받은 최신 지표 스냅샷을 전달."""
+    ticker: str
+    currency: str = "USD"
+    date: str                          # 최신 캔들 날짜 (캐시 키)
+    price: float
+    rsi: Optional[float] = None
+    macd: Optional[float] = None
+    macd_signal: Optional[float] = None
+    macd_hist: Optional[float] = None
+    stop_price: Optional[float] = None
+    buy_price: Optional[float] = None
+
+class InterpretResponse(BaseModel):
+    ticker: str
+    interpretation: str
+    model: str
+    cached: bool = False
+
+class QuoteData(BaseModel):
+    """워치리스트 요약 (경량 배치)."""
+    ticker: str                      # 요청한 원본 티커
+    price: Optional[float] = None
+    change_pct: Optional[float] = None
+    rsi: Optional[float] = None
+    macd_hist: Optional[float] = None  # 부호로 MACD 방향(↑/↓) 판단
+    currency: str = "USD"
+    error: Optional[str] = None      # 개별 티커 조회 실패 시
 
 class AnalyzeResponse(BaseModel):
     ticker: str

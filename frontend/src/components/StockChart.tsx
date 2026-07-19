@@ -3,7 +3,9 @@ import {
     createChart,
     CandlestickSeries,
     LineSeries,
+    HistogramSeries,
     createSeriesMarkers,
+    createTextWatermark,
     ColorType,
     LineStyle,
     type IChartApi,
@@ -57,6 +59,10 @@ interface ChartDataPoint {
     volume: number;
     stop_price: number | null;
     buy_price: number | null;
+    rsi?: number | null;
+    macd?: number | null;
+    macd_signal?: number | null;
+    macd_hist?: number | null;
 }
 
 interface ProfitTargetLevel {
@@ -110,12 +116,16 @@ const StockChart: React.FC<StockChartProps> = ({ data, ticker, currency, showSto
     const stopSeriesRef = useRef<ISeriesApi<'Line'> | null>(null);
     const buySeriesRef = useRef<ISeriesApi<'Line'> | null>(null);
     const entrySeriesRef = useRef<ISeriesApi<'Line'> | null>(null);
+    const rsiSeriesRef = useRef<ISeriesApi<'Line'> | null>(null);
+    const macdSeriesRef = useRef<ISeriesApi<'Line'> | null>(null);
+    const macdSignalSeriesRef = useRef<ISeriesApi<'Line'> | null>(null);
+    const macdHistSeriesRef = useRef<ISeriesApi<'Histogram'> | null>(null);
     const sellMarkersRef = useRef<ReturnType<typeof createSeriesMarkers<Time>> | null>(null);
     const buyMarkersRef = useRef<ReturnType<typeof createSeriesMarkers<Time>> | null>(null);
     const exitMarkersRef = useRef<ReturnType<typeof createSeriesMarkers<Time>> | null>(null);
     const maSeriesMapRef = useRef<Map<string, ISeriesApi<'Line'>>>(new Map());
 
-    const [rangePreset, setRangePreset] = useState<RangeKey>('1M');
+    const [rangePreset, setRangePreset] = useState<RangeKey>('3M');
     const [maDropdownOpen, setMaDropdownOpen] = useState(false);
     const [maType, setMaType] = useState<MAType>('SMA');
     const [maPeriod, setMaPeriod] = useState(20);
@@ -194,11 +204,64 @@ const StockChart: React.FC<StockChartProps> = ({ data, ticker, currency, showSto
             priceLineVisible: false,
         });
 
+        // ---- RSI pane (index 1) ----
+        const rsiSeries = chart.addSeries(LineSeries, {
+            color: '#a78bfa',
+            lineWidth: 2,
+            priceLineVisible: false,
+            lastValueVisible: true,
+            crosshairMarkerVisible: true,
+        }, 1);
+        rsiSeries.createPriceLine({ price: 70, color: 'rgba(239,68,68,0.35)', lineWidth: 1, lineStyle: LineStyle.Dashed, axisLabelVisible: true, title: '70' });
+        rsiSeries.createPriceLine({ price: 30, color: 'rgba(56,189,248,0.35)', lineWidth: 1, lineStyle: LineStyle.Dashed, axisLabelVisible: true, title: '30' });
+
+        // ---- MACD pane (index 2) ----
+        const macdHistSeries = chart.addSeries(HistogramSeries, {
+            priceLineVisible: false,
+            lastValueVisible: false,
+        }, 2);
+        const macdSeries = chart.addSeries(LineSeries, {
+            color: '#3b82f6',
+            lineWidth: 2,
+            priceLineVisible: false,
+            lastValueVisible: false,
+            crosshairMarkerVisible: false,
+        }, 2);
+        const macdSignalSeries = chart.addSeries(LineSeries, {
+            color: '#f59e0b',
+            lineWidth: 2,
+            priceLineVisible: false,
+            lastValueVisible: false,
+            crosshairMarkerVisible: false,
+        }, 2);
+
+        // Pane 높이 비율 (메인:RSI:MACD = 3:1:1) 및 라벨
+        const panes = chart.panes();
+        panes[0]?.setStretchFactor(3);
+        panes[1]?.setStretchFactor(1);
+        panes[2]?.setStretchFactor(1);
+        if (panes[1]) {
+            createTextWatermark(panes[1], {
+                horzAlign: 'left', vertAlign: 'top',
+                lines: [{ text: 'RSI (14)', color: 'rgba(167,139,250,0.5)', fontSize: 11 }],
+            });
+        }
+        if (panes[2]) {
+            createTextWatermark(panes[2], {
+                horzAlign: 'left', vertAlign: 'top',
+                lines: [{ text: 'MACD (12, 26, 9)', color: 'rgba(59,130,246,0.5)', fontSize: 11 }],
+            });
+        }
+
         chartRef.current = chart;
         candleSeriesRef.current = candleSeries;
         stopSeriesRef.current = stopSeries;
         buySeriesRef.current = buySeries;
         entrySeriesRef.current = entrySeries;
+        rsiSeriesRef.current = rsiSeries;
+        macdSeriesRef.current = macdSeries;
+        macdSignalSeriesRef.current = macdSignalSeries;
+        macdHistSeriesRef.current = macdHistSeries;
 
         sellMarkersRef.current = createSeriesMarkers(candleSeries, []);
         buyMarkersRef.current = createSeriesMarkers(candleSeries, []);
@@ -220,6 +283,10 @@ const StockChart: React.FC<StockChartProps> = ({ data, ticker, currency, showSto
             stopSeriesRef.current = null;
             buySeriesRef.current = null;
             entrySeriesRef.current = null;
+            rsiSeriesRef.current = null;
+            macdSeriesRef.current = null;
+            macdSignalSeriesRef.current = null;
+            macdHistSeriesRef.current = null;
             sellMarkersRef.current = null;
             buyMarkersRef.current = null;
             exitMarkersRef.current = null;
@@ -333,6 +400,36 @@ const StockChart: React.FC<StockChartProps> = ({ data, ticker, currency, showSto
             exitMarkersRef.current.setMarkers(exitMarkers);
         } else if (exitMarkersRef.current) {
             exitMarkersRef.current.setMarkers([]);
+        }
+
+        // RSI pane
+        if (rsiSeriesRef.current) {
+            const rsiData = data
+                .filter(d => d.rsi != null)
+                .map(d => ({ time: d.date as Time, value: d.rsi as number }));
+            rsiSeriesRef.current.setData(rsiData);
+        }
+
+        // MACD pane (히스토그램 + MACD 라인 + 시그널 라인)
+        if (macdHistSeriesRef.current) {
+            const histData = data
+                .filter(d => d.macd_hist != null)
+                .map(d => ({
+                    time: d.date as Time,
+                    value: d.macd_hist as number,
+                    color: (d.macd_hist as number) >= 0 ? 'rgba(34,197,94,0.5)' : 'rgba(239,68,68,0.5)',
+                }));
+            macdHistSeriesRef.current.setData(histData);
+        }
+        if (macdSeriesRef.current) {
+            macdSeriesRef.current.setData(
+                data.filter(d => d.macd != null).map(d => ({ time: d.date as Time, value: d.macd as number }))
+            );
+        }
+        if (macdSignalSeriesRef.current) {
+            macdSignalSeriesRef.current.setData(
+                data.filter(d => d.macd_signal != null).map(d => ({ time: d.date as Time, value: d.macd_signal as number }))
+            );
         }
 
         // 기본 가시 범위 적용 (최근 1개월 등)
@@ -532,7 +629,7 @@ const StockChart: React.FC<StockChartProps> = ({ data, ticker, currency, showSto
                     </div>
                 </div>
             </div>
-            <div ref={chartContainerRef} className="h-[350px] md:h-[500px]" />
+            <div ref={chartContainerRef} className="h-[520px] md:h-[720px]" />
         </div>
     );
 };
